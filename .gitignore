@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+venv/
+.venv/
+
+# Env (NUNCA se sube)
+.env
+
+# Docker volumes / data
+postgres_data/
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
