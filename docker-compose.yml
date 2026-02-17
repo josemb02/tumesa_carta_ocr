@@ -1,0 +1,73 @@
+services:
+  api:
+    build: .
+    container_name: menu_ocr_api
+    restart: unless-stopped
+
+    # Expongo SOLO la API hacia mi PC
+    ports:
+      - "8000:8000"
+
+    # Cargo variables de entorno (DATABASE_URL, etc.)
+    env_file:
+      - .env
+
+    # =========================
+    # HARDENING (SEGURIDAD)
+    # =========================
+    # Dejo el sistema de archivos en solo lectura.
+    # Si la app intenta escribir a /app, fallará (y eso es bueno).
+    read_only: true
+
+    # Le doy un /tmp en memoria para temporales (OCR, etc.)
+    tmpfs:
+      - /tmp
+
+    # Evita escaladas de privilegios dentro del contenedor
+    security_opt:
+      - no-new-privileges:true
+
+    # El contenedor no necesita capacidades extra del kernel
+    cap_drop:
+      - ALL
+
+    # Espero a que la BD esté lista antes de arrancar la API
+    depends_on:
+      db:
+        condition: service_healthy
+
+    # Limito recursos para que no se coma el PC/servidor
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: "256M"
+
+  db:
+    image: postgres:15-alpine
+    container_name: menu_ocr_db
+    restart: unless-stopped
+
+    # Usuario, password y db salen del .env
+    env_file:
+      - .env
+
+    # Volumen para persistencia (si apago docker, no pierdo datos)
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+    # IMPORTANTE:
+    # NO expongo el 5432 al exterior.
+    # Solo la API puede acceder por la red interna de docker.
+    # ports:
+    #   - "5432:5432"
+
+    # Healthcheck: docker sabe cuándo Postgres está listo
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  postgres_data:
