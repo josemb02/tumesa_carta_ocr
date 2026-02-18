@@ -8,6 +8,14 @@ Aquí:
 - Defino los endpoints principales
 
 Este archivo actúa como punto de entrada del backend.
+
+Enfoque de seguridad aplicado (basado en OWASP):
+
+- Validación estricta de entrada (Improper Input Validation)
+- Manejo seguro de errores (Improper Error Handling)
+- Cabeceras de seguridad (Security Misconfiguration)
+- Limitación de recursos (Unrestricted Resource Consumption)
+- Logging para trazabilidad (Security Logging & Monitoring)
 """
 
 from fastapi import FastAPI, Depends, Request
@@ -36,7 +44,8 @@ app = FastAPI(title="TuMesa Carta OCR", version="1.0.0")
 # Configuración básica de logging
 # ---------------------------------------------------------
 # Uso logging en lugar de prints porque es más profesional.
-# Esto permite:
+# OWASP: Security Logging & Monitoring Failures
+# Permite:
 # - Registrar peticiones
 # - Registrar errores
 # - Diagnosticar problemas en producción
@@ -67,15 +76,14 @@ def crear_tablas():
 # - Ruta
 # - Código de estado
 # - Tiempo de ejecución
+# OWASP: Security Logging & Monitoring
 # ---------------------------------------------------------
 
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
 
     inicio = time.time()
-
     response = await call_next(request)
-
     duracion_ms = int((time.time() - inicio) * 1000)
 
     logger.info(
@@ -92,10 +100,12 @@ async def log_requests(request: Request, call_next):
 # ---------------------------------------------------------
 # Middleware de cabeceras de seguridad (OWASP)
 # ---------------------------------------------------------
-# Añade headers recomendados para evitar:
-# - Clickjacking
-# - Content sniffing
-# - Acceso a funcionalidades no deseadas
+# OWASP: Security Misconfiguration
+# Añade headers defensivos para mitigar:
+# - Clickjacking (X-Frame-Options)
+# - Content sniffing (X-Content-Type-Options)
+# - Fugas de información vía referer
+# - Uso no deseado de APIs del navegador
 # ---------------------------------------------------------
 
 @app.middleware("http")
@@ -114,7 +124,8 @@ async def security_headers(request: Request, call_next):
 # ---------------------------------------------------------
 # Middleware para limitar tamaño del body (Anti-DoS)
 # ---------------------------------------------------------
-# Evita que alguien envíe un JSON gigante para consumir recursos.
+# OWASP: Unrestricted Resource Consumption
+# Evita que alguien envíe un JSON enorme para consumir memoria
 # Límite actual: 1MB
 # ---------------------------------------------------------
 
@@ -122,7 +133,6 @@ async def security_headers(request: Request, call_next):
 async def limit_body_size(request: Request, call_next):
 
     max_bytes = 1024 * 1024  # 1 MB
-
     content_length = request.headers.get("content-length")
 
     if content_length is not None:
@@ -142,13 +152,14 @@ async def limit_body_size(request: Request, call_next):
 
 
 # ---------------------------------------------------------
-# Handler global para errores de validación (Pydantic)
+# Handler global para errores de validación
 # ---------------------------------------------------------
-# Se ejecuta cuando el JSON no cumple el schema.
+# OWASP: Improper Input Validation
+# Se ejecuta cuando el JSON no cumple el schema Pydantic.
 # Ejemplos:
 # - nombre vacío
 # - precio negativo
-# - campo extra no permitido
+# - campo extra no permitido (extra=forbid)
 # ---------------------------------------------------------
 
 @app.exception_handler(RequestValidationError)
@@ -167,8 +178,9 @@ def validation_exception_handler(request: Request, exc: RequestValidationError):
 # ---------------------------------------------------------
 # Handler global para errores inesperados
 # ---------------------------------------------------------
-# Nunca devuelvo el stacktrace al cliente.
-# Solo registro el error internamente.
+# OWASP: Improper Error Handling
+# Nunca devuelvo stacktrace ni detalles internos.
+# Solo registro el error internamente en logs.
 # ---------------------------------------------------------
 
 @app.exception_handler(Exception)
@@ -205,6 +217,11 @@ def health():
 # Recibe:
 # - barId por query
 # - menu validado por Pydantic en body
+#
+# OWASP: Injection (mitigación)
+# - No construyo SQL manualmente
+# - Uso SQLAlchemy ORM (consultas parametrizadas)
+# - El input ya viene validado antes de tocar la BD
 # ---------------------------------------------------------
 
 @app.post("/menus/guardar")
@@ -214,9 +231,6 @@ def guardar_menu(barId: int, menu: MenuIn, db: Session = Depends(get_db)):
         "barId": barId,
         "categorias": []
     }
-
-    # Copio manualmente categorías y productos
-    # (sin usar map ni cosas complejas, código claro y controlado)
 
     for categoria_entrada in menu.categorias:
 
@@ -238,8 +252,6 @@ def guardar_menu(barId: int, menu: MenuIn, db: Session = Depends(get_db)):
 
         menu_json["categorias"].append(categoria)
 
-    # Guardo el JSON completo como texto en base de datos
-
     nuevo_menu = Menu(
         bar_id=barId,
         menu_json=json.dumps(menu_json, ensure_ascii=False)
@@ -254,6 +266,9 @@ def guardar_menu(barId: int, menu: MenuIn, db: Session = Depends(get_db)):
 
 # ---------------------------------------------------------
 # Endpoint para obtener el último menú de un bar
+# ---------------------------------------------------------
+# OWASP: Injection (mitigación)
+# Uso ORM con filtros parametrizados.
 # ---------------------------------------------------------
 
 @app.get("/menus/{barId}")
