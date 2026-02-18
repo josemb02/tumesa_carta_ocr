@@ -1,6 +1,7 @@
 from sqlalchemy import Column, Integer, Text, DateTime
 from sqlalchemy.sql import func
-from database import Base
+from app.database import Base
+
 
 """
 Aquí defino las tablas.
