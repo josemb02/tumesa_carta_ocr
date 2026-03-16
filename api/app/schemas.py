@@ -1,7 +1,8 @@
 from pydantic import BaseModel, EmailStr, Field
-from typing import Optional, List
+from typing import Optional
 from uuid import UUID
 from decimal import Decimal
+from datetime import date
 
 
 # =========================================================
@@ -28,9 +29,16 @@ class RegisterRequest(BaseModel):
     """
     Datos necesarios para registrar un usuario.
     """
-    username: str = Field(min_length=3, max_length=50)
+    # username va con máximo 30 porque en la BD
+    # la columna real users.username es VARCHAR(30)
+    username: str = Field(min_length=3, max_length=30)
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)
+
+    # Datos básicos del perfil
+    fecha_nacimiento: Optional[date] = None
+    pais: Optional[str] = None
+    ciudad: Optional[str] = None
 
 
 class LoginRequest(BaseModel):
@@ -82,24 +90,29 @@ class GroupResponse(BaseModel):
 
 class CreateCheckinRequest(BaseModel):
     """
-    Crear un check-in (una cerveza tomada).
+    Crear un check-in de cerveza.
     """
     lat: Decimal
     lng: Decimal
 
     group_id: Optional[UUID] = None
     icon_id: Optional[UUID] = None
+
+    precio: Optional[Decimal] = None
+
     note: Optional[str] = Field(default=None, max_length=180)
 
 
 class CheckinResponse(BaseModel):
     """
-    Respuesta básica de check-in.
+    Respuesta básica del check-in creado.
     """
     id: UUID
     lat: Decimal
     lng: Decimal
+    precio: Optional[Decimal]
     note: Optional[str]
+
 
 class MapCheckinResponse(BaseModel):
     """
@@ -108,6 +121,8 @@ class MapCheckinResponse(BaseModel):
     id: UUID
     lat: Decimal
     lng: Decimal
+    precio: Optional[Decimal]
+
 
 # =========================================================
 # GROUP CHAT
@@ -115,14 +130,14 @@ class MapCheckinResponse(BaseModel):
 
 class SendMessageRequest(BaseModel):
     """
-    Enviar mensaje al chat de un grupo.
+    Datos necesarios para enviar un mensaje al grupo.
     """
     message: str = Field(min_length=1, max_length=500)
 
 
 class MessageResponse(BaseModel):
     """
-    Mensaje del chat.
+    Mensaje del chat de grupo.
     """
     id: UUID
     user_id: UUID
@@ -135,7 +150,7 @@ class MessageResponse(BaseModel):
 
 class RankingEntry(BaseModel):
     """
-    Entrada del ranking del grupo.
+    Entrada individual del ranking.
     """
     user_id: UUID
     username: str

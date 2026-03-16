@@ -12,8 +12,8 @@
 #   ranking, iconos, chat y auditoría
 #
 # Seguridad / calidad:
-# - Usamos UUID para entidades principales
-# - Añadimos constraints iguales a los del SQL
+# - Se usa UUID para entidades principales
+# - Se añaden constraints iguales a los del SQL
 # - Esto ayuda a evitar datos basura y estados inconsistentes
 # - OWASP A04 / A05:
 #   una buena integridad de datos y una configuración clara
@@ -25,6 +25,7 @@ import uuid
 from sqlalchemy import (
     Column,
     String,
+    Date,
     DateTime,
     Boolean,
     Integer,
@@ -59,6 +60,13 @@ class User(Base):
     email = Column(String(254), unique=True, nullable=True)
     username = Column(String(30), unique=True, nullable=False)
     password_hash = Column(Text, nullable=True)
+
+    # Información básica del perfil.
+    # fecha_nacimiento va como Date porque en PostgreSQL
+    # la columna real está definida como DATE.
+    fecha_nacimiento = Column(Date, nullable=True)
+    pais = Column(String(80), nullable=True)
+    ciudad = Column(String(120), nullable=True)
 
     role = Column(String(10), nullable=False, server_default="user")
     is_active = Column(Boolean, nullable=False, server_default=text("true"))
@@ -162,7 +170,7 @@ class UserSettings(Base):
 # GROUPS
 # =========================================================
 # Grupo de amigos/colegas.
-# join_code sirve para entrar con código, estilo PoopMap.
+# join_code sirve para entrar con código.
 # =========================================================
 
 class Group(Base):
@@ -207,7 +215,7 @@ class GroupMember(Base):
 # =========================================================
 # Cada cerveza que toma el usuario.
 # Puede ir asociada o no a un grupo.
-# Se guarda lat/lng y el icono usado en ese momento.
+# Se guarda lat/lng, precio y el icono usado en ese momento.
 # =========================================================
 
 class Checkin(Base):
@@ -222,12 +230,15 @@ class Checkin(Base):
     lat = Column(Numeric(9, 6), nullable=False)
     lng = Column(Numeric(9, 6), nullable=False)
 
+    precio = Column(Numeric(6, 2), nullable=True)
+
     note = Column(String(180), nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
     __table_args__ = (
         CheckConstraint("lat >= -90 AND lat <= 90", name="checkins_lat_chk"),
         CheckConstraint("lng >= -180 AND lng <= 180", name="checkins_lng_chk"),
+        CheckConstraint("(precio IS NULL OR precio >= 0)", name="checkins_precio_chk"),
     )
 
     user = relationship("User", back_populates="checkins")
@@ -237,7 +248,7 @@ class Checkin(Base):
 # CHECKIN PHOTOS
 # =========================================================
 # Fotos opcionales del check-in.
-# La idea es guardar aquí la URL final si usas Firebase Storage.
+# Se guarda también el usuario que sube la foto.
 # =========================================================
 
 class CheckinPhoto(Base):
@@ -245,6 +256,8 @@ class CheckinPhoto(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     checkin_id = Column(UUID(as_uuid=True), ForeignKey("checkins.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+
     url = Column(Text, nullable=False)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
@@ -253,8 +266,7 @@ class CheckinPhoto(Base):
 # POINTS LEDGER
 # =========================================================
 # Ledger de puntos.
-# Esto evita guardar solo un saldo total sin historial.
-# Cada movimiento queda auditado y eso da mucha flexibilidad.
+# Cada movimiento queda registrado para poder reconstruir el saldo.
 # =========================================================
 
 class PointsLedger(Base):
@@ -283,7 +295,6 @@ class PointsLedger(Base):
 # GROUP MESSAGES
 # =========================================================
 # Chat simple del grupo.
-# Para el MVP solo texto. Si mañana quieres adjuntos, se amplía.
 # =========================================================
 
 class GroupMessage(Base):
@@ -319,6 +330,7 @@ class UserDevice(Base):
     __table_args__ = (
         CheckConstraint("platform IN ('android','ios')", name="device_platform_chk"),
         UniqueConstraint("platform", "push_token", name="device_unique"),
+        UniqueConstraint("user_id", "push_token", name="device_user_unique"),
     )
 
     user = relationship("User", back_populates="devices")
@@ -327,9 +339,8 @@ class UserDevice(Base):
 # =========================================================
 # AUDIT LOGS
 # =========================================================
-# Trazabilidad de acciones importantes.
-# Muy útil para seguridad, depuración 
-# OWASP: Logging & Monitoring.
+# Registro de acciones importantes dentro del sistema.
+# Permite tener trazabilidad para seguridad y depuración.
 # =========================================================
 
 class AuditLog(Base):
@@ -343,3 +354,35 @@ class AuditLog(Base):
     user_agent = Column(String(200), nullable=True)
 
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+# =========================================================
+# USER POINTS TOTAL
+# =========================================================
+# Tabla resumen de puntos por usuario.
+# Se usa para rankings rápidos sin tener que sumar
+# todo el ledger cada vez.
+# =========================================================
+
+class UserPointsTotal(Base):
+    __tablename__ = "user_points_total"
+
+    user_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        primary_key=True
+    )
+
+    total_points = Column(
+        Integer,
+        nullable=False,
+        server_default="0"
+    )
+
+    updated_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now()
+    )
+
+    user = relationship("User")

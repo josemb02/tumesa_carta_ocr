@@ -24,6 +24,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
 
     # Límites (compose clásico)
     cpus: "0.50"
@@ -40,8 +42,7 @@ services:
       # Persistencia real de la BD
       - beermap_postgres_data:/var/lib/postgresql/data
 
-      # ✅ IMPORTANTE: ejecuta tus scripts al crear la BD por primera vez
-      # (tu archivo: ./api/db/001_init.sql)
+      # IMPORTANTE: ejecuta los scripts al crear la BD por primera vez
       - ./api/db:/docker-entrypoint-initdb.d:ro
 
     # No expongo Postgres al exterior (solo red interna Docker)
@@ -50,6 +51,25 @@ services:
 
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+
+    command: ["redis-server", "--appendonly", "yes"]
+
+    volumes:
+      - beermap_redis_data:/data
+
+    # No expongo Redis al exterior
+    # ports:
+    #   - "6379:6379"
+
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 3s
       retries: 10
@@ -81,3 +101,4 @@ services:
 
 volumes:
   beermap_postgres_data:
+  beermap_redis_data:

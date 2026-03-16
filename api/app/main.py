@@ -30,7 +30,7 @@
 #     * audit logs + request_id + logging uniforme
 # -------------------------------------------------------------------
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import FastAPI, Depends, HTTPException, status, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -68,6 +68,7 @@ from .audit import write_audit_log
 from .routers.groups_router import router as groups_router
 from .routers.checkins_router import router as checkins_router
 from .routers.rankings_router import router as rankings_router
+from .routers.chat_router import router as chat_router
 
 # -------------------------------------------------------------------
 # Creación de la app principal
@@ -90,8 +91,17 @@ app = FastAPI(
 # -------------------------------------------------------------------
 app.add_middleware(RequestContextMiddleware)
 app.add_middleware(SecurityHeadersMiddleware)
+
+
+# -------------------------------------------------------------------
+# Registro de routers
+# -------------------------------------------------------------------
+# Aquí se conectan los bloques funcionales principales del backend.
+# -------------------------------------------------------------------
 app.include_router(rankings_router)
 app.include_router(checkins_router)
+app.include_router(groups_router)
+app.include_router(chat_router)
 
 
 # -------------------------------------------------------------------
@@ -112,6 +122,7 @@ if settings.CORS_ORIGINS:
 
         for p in parts:
             origin = p.strip()
+
             if origin:
                 cors_origins.append(origin)
 
@@ -139,16 +150,6 @@ app.add_exception_handler(Exception, generic_exception_handler)
 
 
 # -------------------------------------------------------------------
-# Registro de routers
-# -------------------------------------------------------------------
-# Aquí conectamos los "controllers" separados del proyecto.
-# De esta forma main.py no se convierte en un archivo gigante.
-# -------------------------------------------------------------------
-app.include_router(groups_router)
-app.include_router(checkins_router)
-
-
-# -------------------------------------------------------------------
 # HEALTH
 # -------------------------------------------------------------------
 # Endpoint de salud simple para:
@@ -160,7 +161,7 @@ app.include_router(checkins_router)
 def health():
     return {
         "status": "ok",
-        "ts": datetime.utcnow().isoformat()
+        "ts": datetime.now(timezone.utc).isoformat()
     }
 
 
@@ -180,6 +181,7 @@ def register(
     - limita intentos por IP para evitar abuso del endpoint
     - comprueba email y username duplicados
     - guarda la contraseña hasheada
+    - guarda también los datos básicos del perfil
     - crea un audit log
     - devuelve solo datos seguros del usuario
 
@@ -199,6 +201,17 @@ def register(
         window_seconds=60
     )
 
+    # Limpiamos algunos campos de texto para guardar datos más consistentes.
+    username_limpio = payload.username.strip()
+
+    pais_limpio = None
+    if payload.pais is not None:
+        pais_limpio = payload.pais.strip()
+
+    ciudad_limpia = None
+    if payload.ciudad is not None:
+        ciudad_limpia = payload.ciudad.strip()
+
     # Comprobamos si el email ya existe
     existing_email = db.query(User).filter(User.email == payload.email).first()
     if existing_email is not None:
@@ -208,7 +221,7 @@ def register(
         )
 
     # Comprobamos si el username ya existe
-    existing_username = db.query(User).filter(User.username == payload.username).first()
+    existing_username = db.query(User).filter(User.username == username_limpio).first()
     if existing_username is not None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -216,10 +229,14 @@ def register(
         )
 
     # Creamos el usuario guardando solo el hash de la contraseña
+    # y los datos básicos del perfil.
     user = User(
-        username=payload.username,
+        username=username_limpio,
         email=payload.email,
         password_hash=hash_password(payload.password),
+        fecha_nacimiento=payload.fecha_nacimiento,
+        pais=pais_limpio,
+        ciudad=ciudad_limpia,
         role="user",
     )
 
@@ -240,6 +257,9 @@ def register(
         "id": str(user.id),
         "username": user.username,
         "email": user.email,
+        "fecha_nacimiento": user.fecha_nacimiento,
+        "pais": user.pais,
+        "ciudad": user.ciudad,
         "role": user.role,
     }
 
@@ -296,6 +316,20 @@ def login(
             detail="Credenciales inválidas",
         )
 
+    # Si el usuario está desactivado, no se permite login.
+    if user.is_active is False:
+        write_audit_log(
+            db=db,
+            action="auth_login_blocked_inactive",
+            request=request,
+            user_id=user.id
+        )
+
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Usuario inactivo",
+        )
+
     ok = verify_password(payload.password, user.password_hash)
 
     if ok is False:
@@ -339,6 +373,9 @@ def auth_me(current_user: User = Depends(get_current_user)):
         "id": str(current_user.id),
         "username": current_user.username,
         "email": current_user.email,
+        "fecha_nacimiento": current_user.fecha_nacimiento,
+        "pais": current_user.pais,
+        "ciudad": current_user.ciudad,
         "role": current_user.role,
     }
 
