@@ -1,277 +1,329 @@
 # BeerMap API
 
-Backend de una aplicación social orientada a registrar consumiciones, competir en rankings y gestionar grupos con comunicación en tiempo real.
+Backend de una aplicación social orientada a registrar consumiciones, gestionar grupos, consultar rankings y permitir comunicación entre usuarios mediante chat.
 
-El proyecto está diseñado siguiendo buenas prácticas de desarrollo backend, seguridad y organización de código, con una arquitectura preparada para entornos reales.
+El sistema está diseñado como un backend profesional, aplicando principios reales de arquitectura, seguridad, persistencia de datos y despliegue reproducible.
 
 ---
 
 ## Descripción
 
-BeerMap es una API REST que permite a los usuarios:
+BeerMap es una API REST que permite:
 
-* Registrar consumiciones (check-ins)
-* Participar en rankings (globales, por grupo, país o ciudad)
-* Crear y gestionar grupos
-* Enviar y recibir mensajes en chats de grupo
-* Autenticarse de forma segura mediante JWT
+- Registrar consumiciones (check-ins)
+- Crear y gestionar grupos
+- Consultar rankings globales y segmentados
+- Enviar y leer mensajes en chats de grupo
+- Autenticarse mediante JWT
+
+El objetivo del proyecto es construir una base sólida, escalable y segura sobre la que poder desarrollar una aplicación real.
 
 ---
 
 ## Arquitectura del proyecto
 
-El backend está organizado en módulos para separar responsabilidades:
+El backend está organizado siguiendo separación de responsabilidades:
 
-```id="arch01"
-app/
-├── routers/        # Define los endpoints (lo que expone la API)
-├── models.py       # Define las tablas de la base de datos (ORM)
-├── schemas.py      # Define cómo entran y salen los datos (validación)
-├── database.py     # Conexión a la base de datos
-├── auth.py         # Lógica de autenticación (JWT)
-├── middleware.py   # Intercepta peticiones (ej: logs, seguridad)
-├── ratelimit.py    # Limita abusos (ej: login masivo)
-├── audit.py        # Guarda acciones importantes (logs)
-├── config.py       # Variables de entorno
-├── exceptions.py   # Manejo de errores
-└── main.py         # Punto de entrada de la aplicación
-```
+api/
+ └── app/
+     ├── routers/        → Endpoints por funcionalidad
+     ├── models.py       → Modelos de base de datos
+     ├── schemas.py      → Validación de datos
+     ├── database.py     → Conexión a PostgreSQL
+     ├── auth.py         → Autenticación y JWT
+     ├── middleware.py   → Middleware global
+     ├── ratelimit.py    → Protección contra abuso
+     ├── audit.py        → Registro de acciones
+     ├── config.py       → Configuración del sistema
+     ├── exceptions.py   → Manejo de errores
+     └── main.py         → Punto de entrada
 
-Esto permite:
-
-* código más limpio
-* fácil mantenimiento
-* escalabilidad futura
+Esta estructura permite mantener el código limpio, escalable y fácil de mantener.
 
 ---
 
-## Tecnologías utilizadas
+## Stack tecnológico
 
 ### Backend
-
-* FastAPI → framework para crear APIs rápidas y tipadas
-* SQLAlchemy → ORM para interactuar con la base de datos sin SQL manual
-* Pydantic → validación de datos de entrada/salida
+- FastAPI → Framework principal para la API
+- Python → Lenguaje del backend
+- SQLAlchemy → ORM para base de datos
+- Pydantic → Validación de datos
 
 ### Base de datos
-
-* PostgreSQL → almacena usuarios, grupos, check-ins, mensajes, etc.
+- PostgreSQL → Base de datos relacional principal
 
 ### Seguridad
-
-* JWT → identifica al usuario en cada petición
-* Bcrypt → encripta las contraseñas
-* Rate limiting → evita ataques por fuerza bruta
-* Audit logs → registra acciones importantes
+- JWT → Autenticación basada en tokens
+- Bcrypt → Hash de contraseñas
+- Rate limiting → Protección contra ataques
+- Auditoría → Registro de acciones
 
 ### Infraestructura
+- Docker → Contenedorización
+- Docker Compose → Orquestación de servicios
 
-* Docker → permite ejecutar todo el proyecto en contenedores
-* Docker Compose → levanta todos los servicios juntos
+### Servicios auxiliares
+- Redis → Memoria en caché y control de peticiones
+- Adminer → Gestión visual de base de datos
+
+### Testing
+- Pytest → Tests automáticos
+- Postman → Tests manuales
+
+### CI/CD
+- GitHub Actions → Automatización de pruebas y validación
 
 ---
 
-## Seguridad (explicado fácil)
+## Explicación técnica de componentes
 
-El sistema protege contra problemas comunes:
+### FastAPI
+Framework usado para construir la API REST.
 
-* Un usuario no puede acceder a datos de otro (control de acceso)
-* No se guardan contraseñas en texto plano
-* No se permite hacer muchas peticiones seguidas (anti ataques)
-* Todas las acciones importantes quedan registradas
+Permite:
+- Crear endpoints rápidamente
+- Validar datos automáticamente
+- Generar documentación Swagger
+- Mantener código limpio y tipado
 
 ---
 
-## Autenticación
+### PostgreSQL
+Base de datos principal del sistema.
 
-Para usar la API:
+Se utiliza para almacenar:
+- Usuarios
+- Grupos
+- Mensajes
+- Check-ins
+- Rankings
+- Auditoría
 
-1. El usuario se registra
-2. Hace login
-3. Recibe un token (JWT)
-4. Usa ese token en cada petición protegida
+Permite relaciones estructuradas y consultas eficientes.
+
+---
+
+### Redis
+Servicio en memoria de alto rendimiento.
+
+Se utiliza para:
+
+- Controlar número de intentos de login
+- Evitar ataques de fuerza bruta
+- Limitar peticiones repetidas
+- Preparar el sistema para cache
+
+Ejemplo real:
+Si un usuario intenta hacer login muchas veces seguidas, Redis guarda ese contador y bloquea temporalmente.
+
+Esto evita sobrecargar la base de datos y mejora la seguridad.
+
+---
+
+### JWT (Autenticación)
+Sistema de autenticación basado en tokens.
+
+Flujo:
+1. Usuario hace login
+2. Se genera un token
+3. El cliente lo guarda
+4. Se usa en cada petición
 
 Ejemplo:
 
-```id="auth01"
-Authorization: Bearer <token>
-```
+Authorization: Bearer TOKEN
 
-Este token identifica al usuario sin tener que enviar usuario/contraseña cada vez.
+Permite proteger endpoints sin reenviar credenciales.
 
 ---
 
-## Endpoints principales (explicados)
+### Bcrypt
+Sistema de hash de contraseñas.
 
-### Auth
+Sirve para:
+- No guardar contraseñas en texto plano
+- Evitar filtraciones de datos sensibles
 
-* `/auth/register`
-  Crea un usuario nuevo validando datos y evitando duplicados
+---
 
-* `/auth/login`
-  Comprueba credenciales y devuelve un token
+### Docker
+Permite ejecutar cada parte del sistema en un contenedor independiente.
 
-* `/auth/me`
-  Devuelve los datos del usuario autenticado
+Ventajas:
+- Entorno reproducible
+- Aislamiento de servicios
+- Fácil despliegue
+
+---
+
+### Docker Compose
+Permite levantar todo el sistema con un solo comando:
+
+docker-compose up --build
+
+Coordina:
+- API
+- Base de datos
+- Redis
+- Adminer
+- Frontend
+
+---
+
+### GitHub Actions
+Sistema de CI/CD.
+
+Sirve para:
+- Ejecutar tests automáticamente
+- Validar el código al subir cambios
+- Evitar errores en producción
+
+---
+
+## Variables de entorno
+
+### DATABASE_URL
+Cadena de conexión a PostgreSQL.
+
+Indica:
+- usuario
+- contraseña
+- host
+- base de datos
+
+Ejemplo:
+DATABASE_URL=postgresql://user:pass@db:5432/beermap
+
+---
+
+### JWT_SECRET
+Clave para firmar tokens.
+
+Sirve para evitar que los tokens puedan ser falsificados.
+
+---
+
+### REDIS_URL
+Conexión con Redis.
+
+Se usa para rate limiting y control de peticiones.
+
+---
+
+### LOGIN_MAX_ATTEMPTS
+Número máximo de intentos de login.
+
+Sirve para bloquear ataques de fuerza bruta.
+
+---
+
+### CHECKIN_COOLDOWN_SECONDS
+Tiempo mínimo entre check-ins.
+
+Evita spam y abuso del sistema.
+
+---
+
+## Funcionalidades principales
+
+### Usuarios
+- Registro
+- Login
+- Perfil autenticado
 
 ---
 
 ### Check-ins
-
-* `/checkins`
-  Permite registrar una consumición
-
-  Internamente:
-
-  * controla que no se haga spam (cooldown)
-  * valida los datos (ubicación, precio)
-  * suma puntos al usuario
-
-* `/checkins/my-map`
-  Devuelve los check-ins del usuario para mostrarlos en un mapa
+- Registrar consumiciones
+- Añadir localización
+- Sumar puntos
 
 ---
 
 ### Rankings
+- Ranking global
+- Ranking por grupo
+- Ranking por ubicación
 
-* `/rankings/global`
-  Ranking de todos los usuarios
-
-* `/rankings/group/{group_id}`
-  Ranking solo dentro de un grupo
-
-* `/rankings/country/{pais}`
-  Ranking por país
-
-* `/rankings/city/{ciudad}`
-  Ranking por ciudad
-
-Todos los rankings:
-
-* están ordenados por puntos
-* usan una tabla optimizada (`user_points_total`)
+Optimizado mediante tabla de puntos acumulados.
 
 ---
 
 ### Grupos
-
-* `/groups` → crear grupo
-* `/groups/join` → unirse con código
-* `/groups/my` → listar grupos del usuario
-* `/groups/{group_id}/members` → ver miembros
+- Crear grupo
+- Unirse por código
+- Listar miembros
 
 ---
 
 ### Chat
-
-* `/chat/group/{group_id}`
-  Permite enviar y leer mensajes
-
-  Seguridad:
-
-  * solo miembros del grupo pueden acceder
+- Enviar mensajes
+- Leer mensajes
+- Acceso restringido a miembros
 
 ---
 
-## Sistema de puntos
+## Seguridad aplicada
 
-Cada check-in suma:
-
-* +1 punto al usuario
-* se guarda en histórico
-* se actualiza una tabla optimizada (`user_points_total`)
-
-Esto mejora el rendimiento en rankings.
+- Autenticación JWT
+- Contraseñas hasheadas
+- Rate limiting en login
+- Validación de acceso a recursos
+- Control de errores
+- Uso de ORM para evitar inyección SQL
+- Registro de acciones
 
 ---
 
-## Variables de entorno (explicadas)
+## Ejecución del proyecto
 
-```id="env01"
-DATABASE_URL=postgresql://user:password@db:5432/beermap
-```
+Ejecutar:
 
-➡️ Indica cómo conectarse a la base de datos
-➡️ Incluye usuario, contraseña, host y nombre de la BD
+docker-compose up --build
 
-```id="env02"
-JWT_SECRET=clave_super_secreta
-```
+---
 
-➡️ Se usa para firmar los tokens JWT
-➡️ Evita que alguien falsifique identidades
+## Accesos
 
-```id="env03"
-REDIS_URL=redis://redis:6379/0
-```
-
-➡️ Conexión a Redis
-➡️ Se usa para limitar peticiones y mejorar rendimiento
-
-```id="env04"
-LOGIN_MAX_ATTEMPTS=5
-```
-
-➡️ Número máximo de intentos de login
-
-```id="env05"
-CHECKIN_COOLDOWN_SECONDS=300
-```
-
-➡️ Tiempo mínimo entre check-ins (5 minutos)
-➡️ Evita spam
+- API → http://localhost:8000  
+- Docs → http://localhost:8000/docs  
+- Frontend → http://localhost:5000  
+- Adminer → http://localhost:8081  
 
 ---
 
 ## Testing
 
-Se incluye una colección de Postman para probar la API completa:
+El proyecto incluye:
 
-* registro
-* login
-* check-ins
-* grupos
-* rankings
-* chat
-
----
-
-## Despliegue
-
-Para ejecutar el proyecto:
-
-```bash id="run01"
-docker-compose up --build
-```
-
-Esto levanta:
-
-* API
-* base de datos PostgreSQL
-* Redis
-
----
-
-## Escalabilidad
-
-El sistema está preparado para:
-
-* añadir frontend sin cambios en backend
-* escalar base de datos
-* añadir cache con Redis
-* dividir en microservicios
+- Tests automáticos con Pytest
+- Colección Postman para pruebas manuales
 
 ---
 
 ## Estado del proyecto
 
-* Backend completamente funcional
-* Seguridad implementada
-* Infraestructura operativa
-* Frontend pendiente
+- Backend completo
+- Seguridad implementada
+- Docker operativo
+- CI/CD activo
+- Frontend en desarrollo
+
+---
+
+## Conclusión
+
+BeerMap es un backend diseñado con enfoque profesional, preparado para:
+
+- escalar
+- integrarse con frontend
+- desplegarse en entornos reales
+
+Se han aplicado prácticas reales de desarrollo, seguridad e infraestructura.
 
 ---
 
 ## Autor
 
-Proyecto orientado a demostrar conocimientos reales de desarrollo backend, seguridad y arquitectura de APIs.
+Proyecto desarrollado como base real de backend para aplicación social.
