@@ -25,19 +25,18 @@ El objetivo del proyecto es construir una base sólida, escalable y segura sobre
 El backend está organizado siguiendo separación de responsabilidades:
 
 api/
- └── app/
-     ├── routers/        → Endpoints por funcionalidad
-     ├── models.py       → Modelos de base de datos
-     ├── schemas.py      → Validación de datos
-     ├── database.py     → Conexión a PostgreSQL
-     ├── auth.py         → Autenticación y JWT
-     ├── middleware.py   → Middleware global
-     ├── ratelimit.py    → Protección contra abuso
-     ├── audit.py        → Registro de acciones
-     ├── config.py       → Configuración del sistema
-     ├── exceptions.py   → Manejo de errores
-     └── main.py         → Punto de entrada
-
+└── app/
+├── routers/ → Endpoints por funcionalidad
+├── models.py → Modelos de base de datos
+├── schemas.py → Validación de datos
+├── database.py → Conexión a PostgreSQL
+├── auth.py → Autenticación y JWT
+├── middleware.py → Middleware global
+├── ratelimit.py → Protección contra abuso
+├── audit.py → Registro de acciones
+├── config.py → Configuración del sistema
+├── exceptions.py → Manejo de errores
+└── main.py → Punto de entrada
 Esta estructura permite mantener el código limpio, escalable y fácil de mantener.
 
 ---
