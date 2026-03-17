@@ -37,10 +37,10 @@ class RegisterRequest(BaseModel):
 
     # Datos básicos del perfil
     fecha_nacimiento: Optional[date] = None
-    pais: Optional[str] = None
-    ciudad: Optional[str] = None
+    pais: str = Field(min_length=2, max_length=80)
+    ciudad: str = Field(min_length=2, max_length=80)
 
-
+    
 class LoginRequest(BaseModel):
     """
     Datos necesarios para hacer login.
