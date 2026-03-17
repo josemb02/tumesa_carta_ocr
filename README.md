@@ -24,6 +24,7 @@ El objetivo del proyecto es construir una base sólida, escalable y segura sobre
 
 El backend está organizado siguiendo separación de responsabilidades:
 
+
 api/
 └── app/
 ├── routers/ → Endpoints por funcionalidad
@@ -37,8 +38,9 @@ api/
 ├── config.py → Configuración del sistema
 ├── exceptions.py → Manejo de errores
 └── main.py → Punto de entrada
-Esta estructura permite mantener el código limpio, escalable y fácil de mantener.
 
+
+Esta estructura permite mantener el código limpio, escalable y fácil de mantener.
 ---
 
 ## Stack tecnológico
