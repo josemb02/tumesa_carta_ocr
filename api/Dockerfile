@@ -33,7 +33,7 @@ ENV PATH="/opt/venv/bin:$PATH" \
 COPY --from=builder /opt/venv /opt/venv
 
 # Copio la app (esto existe dentro de api/app)
-COPY app ./app
+COPY api_app ./app
 
 # Copio tests solo si quieres tenerlos disponibles dentro del contenedor (opcional, no rompe)
 COPY tests ./tests

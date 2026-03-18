@@ -85,20 +85,6 @@ services:
       db:
         condition: service_healthy
 
-  web:
-    build: ./web
-    restart: unless-stopped
-
-    ports:
-      - "5000:5000"
-
-    env_file:
-      - .env
-
-    depends_on:
-      api:
-        condition: service_started
-
 volumes:
   beermap_postgres_data:
   beermap_redis_data:

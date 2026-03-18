@@ -22,17 +22,16 @@ export default function Index() {
         if (cargando) {
             return;
         }
-
         if (usuario) {
-            router.replace("/mapa" as never);
+            router.replace("/(principal)/mapa" as never);
         } else {
             router.replace("/login" as never);
         }
-    }, [cargando, usuario, router]);
+    }, [cargando, usuario]);
 
     return (
         <View style={styles.contenedor}>
-            <ActivityIndicator size="large" />
+            <ActivityIndicator size="large" color="#10233E" />
         </View>
     );
 }
@@ -41,6 +40,7 @@ const styles = StyleSheet.create({
     contenedor: {
         flex: 1,
         justifyContent: "center",
-        alignItems: "center"
+        alignItems: "center",
+        backgroundColor: "#F7F4EC"
     }
 });

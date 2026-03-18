@@ -17,7 +17,7 @@
  *
  * De momento se deja aquí centralizado para cambiarlo fácil.
  */
-export const API_URL = "http://192.168.1.187:8080";
+export const API_URL = "http://localhost:8000";
 
 /*
  * Clave usada para guardar el token de sesión.
