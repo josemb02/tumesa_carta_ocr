@@ -24,23 +24,34 @@ El objetivo del proyecto es construir una base sólida, escalable y segura sobre
 
 El backend está organizado siguiendo separación de responsabilidades:
 
-
+```
 api/
-└── app/
-├── routers/ → Endpoints por funcionalidad
+└── api_app/
+├── routers/ → Endpoints por funcionalidad (auth, chat, grupos, rankings, check-ins)
 ├── models.py → Modelos de base de datos
 ├── schemas.py → Validación de datos
 ├── database.py → Conexión a PostgreSQL
 ├── auth.py → Autenticación y JWT
 ├── middleware.py → Middleware global
 ├── ratelimit.py → Protección contra abuso
-├── audit.py → Registro de acciones
+├── audit.py → Registro de acciones del sistema
 ├── config.py → Configuración del sistema
-├── exceptions.py → Manejo de errores
+├── exceptions.py → Manejo centralizado de errores
 └── main.py → Punto de entrada
+```
 
+Estructura adicional del proyecto:
 
-Esta estructura permite mantener el código limpio, escalable y fácil de mantener.
+```
+api/
+├── db/ → Script SQL inicial
+├── tests/ → Tests automatizados con Pytest
+├── postman/ → Colección de pruebas manuales
+├── exceptions/ → Sistema avanzado de manejo de errores
+```
+
+Esta estructura permite mantener el código limpio, escalable, mantenible y alineado con estándares profesionales de desarrollo backend.
+
 ---
 
 ## Stack tecnológico
@@ -77,6 +88,66 @@ Esta estructura permite mantener el código limpio, escalable y fácil de manten
 
 ---
 
+## Arquitectura de contenedores
+
+El sistema se ejecuta completamente mediante Docker Compose, permitiendo un entorno reproducible, aislado y preparado para despliegue.
+
+### API (FastAPI)
+Contenedor principal del sistema.
+
+Se encarga de:
+- Exponer los endpoints REST
+- Gestionar la lógica de negocio
+- Aplicar la autenticación y seguridad
+- Validar datos
+- Comunicarse con PostgreSQL y Redis
+
+---
+
+### PostgreSQL
+Base de datos relacional donde se almacenan:
+
+- Usuarios
+- Grupos
+- Check-ins
+- Rankings
+- Mensajes
+- Auditoría
+
+Permite integridad de datos y consultas eficientes.
+
+---
+
+### Redis
+Servicio en memoria de alto rendimiento.
+
+Se utiliza para:
+
+- Controlar intentos de login
+- Aplicar rate limiting
+- Evitar ataques de fuerza bruta
+- Optimizar rendimiento del sistema
+
+Ejemplo real:
+Si un usuario intenta iniciar sesión múltiples veces en poco tiempo, Redis bloquea temporalmente el acceso.
+
+---
+
+### Adminer
+Interfaz web para gestión de base de datos.
+
+Permite:
+- Visualizar tablas
+- Ejecutar consultas
+- Administrar datos fácilmente
+
+---
+
+### Frontend
+Aplicación cliente que consume la API y permite la interacción del usuario con el sistema.
+
+---
+
 ## Explicación técnica de componentes
 
 ### FastAPI
@@ -106,19 +177,7 @@ Permite relaciones estructuradas y consultas eficientes.
 ---
 
 ### Redis
-Servicio en memoria de alto rendimiento.
-
-Se utiliza para:
-
-- Controlar número de intentos de login
-- Evitar ataques de fuerza bruta
-- Limitar peticiones repetidas
-- Preparar el sistema para cache
-
-Ejemplo real:
-Si un usuario intenta hacer login muchas veces seguidas, Redis guarda ese contador y bloquea temporalmente.
-
-Esto evita sobrecargar la base de datos y mejora la seguridad.
+Servicio en memoria de alto rendimiento que refuerza la seguridad y el rendimiento.
 
 ---
 
@@ -135,33 +194,29 @@ Ejemplo:
 
 Authorization: Bearer TOKEN
 
-Permite proteger endpoints sin reenviar credenciales.
-
 ---
 
 ### Bcrypt
-Sistema de hash de contraseñas.
-
-Sirve para:
-- No guardar contraseñas en texto plano
-- Evitar filtraciones de datos sensibles
+Sistema de hash de contraseñas que garantiza que no se almacenen credenciales en texto plano.
 
 ---
 
 ### Docker
-Permite ejecutar cada parte del sistema en un contenedor independiente.
+Permite ejecutar cada parte del sistema en contenedores independientes.
 
 Ventajas:
 - Entorno reproducible
 - Aislamiento de servicios
-- Fácil despliegue
+- Facilidad de despliegue
 
 ---
 
 ### Docker Compose
 Permite levantar todo el sistema con un solo comando:
 
+```
 docker-compose up --build
+```
 
 Coordina:
 - API
@@ -173,12 +228,11 @@ Coordina:
 ---
 
 ### GitHub Actions
-Sistema de CI/CD.
+Sistema de CI/CD que:
 
-Sirve para:
-- Ejecutar tests automáticamente
-- Validar el código al subir cambios
-- Evitar errores en producción
+- Ejecuta tests automáticamente
+- Valida el código en cada cambio
+- Garantiza estabilidad del sistema
 
 ---
 
@@ -187,42 +241,30 @@ Sirve para:
 ### DATABASE_URL
 Cadena de conexión a PostgreSQL.
 
-Indica:
-- usuario
-- contraseña
-- host
-- base de datos
-
 Ejemplo:
+```
 DATABASE_URL=postgresql://user:pass@db:5432/beermap
+```
 
 ---
 
 ### JWT_SECRET
-Clave para firmar tokens.
-
-Sirve para evitar que los tokens puedan ser falsificados.
+Clave para firmar tokens y garantizar su autenticidad.
 
 ---
 
 ### REDIS_URL
 Conexión con Redis.
 
-Se usa para rate limiting y control de peticiones.
-
 ---
 
 ### LOGIN_MAX_ATTEMPTS
-Número máximo de intentos de login.
-
-Sirve para bloquear ataques de fuerza bruta.
+Número máximo de intentos de login antes de bloqueo.
 
 ---
 
 ### CHECKIN_COOLDOWN_SECONDS
-Tiempo mínimo entre check-ins.
-
-Evita spam y abuso del sistema.
+Tiempo mínimo entre acciones para evitar abuso del sistema.
 
 ---
 
@@ -238,7 +280,7 @@ Evita spam y abuso del sistema.
 ### Check-ins
 - Registrar consumiciones
 - Añadir localización
-- Sumar puntos
+- Sistema de puntos
 
 ---
 
@@ -247,33 +289,33 @@ Evita spam y abuso del sistema.
 - Ranking por grupo
 - Ranking por ubicación
 
-Optimizado mediante tabla de puntos acumulados.
-
 ---
 
 ### Grupos
 - Crear grupo
 - Unirse por código
-- Listar miembros
+- Gestión de miembros
 
 ---
 
 ### Chat
-- Enviar mensajes
-- Leer mensajes
-- Acceso restringido a miembros
+- Envío de mensajes
+- Lectura de mensajes
+- Acceso restringido
 
 ---
 
 ## Seguridad aplicada
 
+El sistema incorpora múltiples capas de seguridad:
+
 - Autenticación JWT
-- Contraseñas hasheadas
+- Contraseñas hasheadas con bcrypt
 - Rate limiting en login
 - Validación de acceso a recursos
-- Control de errores
+- Control de errores centralizado
 - Uso de ORM para evitar inyección SQL
-- Registro de acciones
+- Registro de acciones mediante auditoría
 
 Además, se han aplicado medidas basadas en OWASP Top 10.
 
@@ -282,11 +324,42 @@ Además, se han aplicado medidas basadas en OWASP Top 10.
 
 ---
 
+## Testing
+
+El proyecto incluye:
+
+### Tests automáticos
+Ejecutar:
+```
+pytest
+```
+
+Incluye pruebas de:
+- autenticación
+- chat
+- check-ins
+- grupos
+- rankings
+
+---
+
+### Tests manuales
+Colección Postman incluida en:
+```
+api/postman/BeerMap.postman_collection.json
+```
+
+---
+
 ## Ejecución del proyecto
 
 Ejecutar:
 
+```
 docker-compose up --build
+```
+
+Esto levanta todos los servicios del sistema de forma coordinada.
 
 ---
 
@@ -299,34 +372,27 @@ docker-compose up --build
 
 ---
 
-## Testing
-
-El proyecto incluye:
-
-- Tests automáticos con Pytest
-- Colección Postman para pruebas manuales
-
----
-
 ## Estado del proyecto
 
-- Backend completo
+- Backend completamente funcional
 - Seguridad implementada
-- Docker operativo
+- Arquitectura modular
+- Contenedores operativos
+- Testing integrado
 - CI/CD activo
-- Frontend en desarrollo
 
 ---
 
 ## Conclusión
 
-BeerMap es un backend diseñado con enfoque profesional, preparado para:
+BeerMap es un backend desarrollado con enfoque profesional que integra:
 
-- escalar
-- integrarse con frontend
-- desplegarse en entornos reales
+- Arquitectura limpia y modular
+- Seguridad aplicada en múltiples niveles
+- Testing automatizado
+- Infraestructura contenerizada
 
-Se han aplicado prácticas reales de desarrollo, seguridad e infraestructura.
+El sistema está preparado para escalar, integrarse con clientes reales y desplegarse en entornos productivos.
 
 ---
 
