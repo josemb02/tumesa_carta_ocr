@@ -34,8 +34,8 @@ type Grupo = {
 };
 
 const ICONOS = [
-    { id: "jarra",  emoji: "🍺", label: "Jarra" },
-    { id: "doble",  emoji: "🍻", label: "Brindis" },
+    { id: "Cortada",  emoji: "🍺", label: "Cortada" },
+    { id: "Entera",  emoji: "🍻", label: "Entera" },
     { id: "refresco", emoji: "🥤", label: "Refresco" },
 ];
 
