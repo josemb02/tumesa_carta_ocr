@@ -1,33 +1,36 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
 import { useRouter } from "expo-router";
 import { usarAuth } from "../contexto/ContextoAuth";
 
-/*
- * Esta pantalla es la puerta de entrada real de la app.
- *
- * Qué hace:
- * - espera a que el contexto termine de comprobar si había sesión guardada
- * - si el usuario ya tiene sesión, lo manda a la zona principal
- * - si no tiene sesión, lo manda a login
- */
 export default function Index() {
-    const auth = usarAuth();
+    const { usuario, cargando } = usarAuth();
     const router = useRouter();
+    const redirigido = useRef(false);
 
-    const usuario = auth.usuario;
-    const cargando = auth.cargando;
-
+    // Redirección cuando cargando termine
     useEffect(() => {
-        if (cargando) {
-            return;
-        }
+        if (cargando) return;
+        if (redirigido.current) return;
+        redirigido.current = true;
+
         if (usuario) {
-            router.replace("/(principal)/mapa" as never);
+            router.replace("/(principal)/mapa");
         } else {
-            router.replace("/login" as never);
+            router.replace("/login");
         }
     }, [cargando, usuario]);
+
+    // Fallback: si pasan 3 segundos y sigue cargando, manda a login
+    useEffect(() => {
+        const timeout = setTimeout(() => {
+            if (redirigido.current) return;
+            redirigido.current = true;
+            router.replace("/login");
+        }, 3000);
+
+        return () => clearTimeout(timeout);
+    }, []);
 
     return (
         <View style={styles.contenedor}>

@@ -1,3 +1,5 @@
+import { Platform } from "react-native";
+
 /*
  * Este archivo guarda las constantes globales de la app.
  *
@@ -10,14 +12,15 @@
 /*
  * URL base del backend.
  *
- * IMPORTANTE:
- * - si pruebas en móvil físico, "localhost" no sirve
- * - debes poner la IP local de tu ordenador en la red
- * - si pruebas en emulador Android, a veces se usa 10.0.2.2
- *
- * De momento se deja aquí centralizado para cambiarlo fácil.
+ * Detecta automáticamente la plataforma:
+ * - En web (navegador) usa localhost
+ * - En móvil físico usa la IP local de la red
  */
-export const API_URL = "http://localhost:8000";
+const IP_LOCAL = "172.20.10.14";
+
+export const API_URL = Platform.OS === "web"
+    ? "http://localhost:8000"
+    : `http://${IP_LOCAL}:8000`;
 
 /*
  * Clave usada para guardar el token de sesión.
