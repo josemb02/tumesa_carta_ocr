@@ -12,10 +12,20 @@ import {
 import { useFocusEffect, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { usarAuth } from "../../contexto/ContextoAuth";
-import { hacerPeticion } from "../../servicios/api";
+import { obtenerMisStats } from "../../servicios/servicioAuth";
 
-type CheckinMapa = { id: string; lat: number; lng: number; precio: number | null };
-type Grupo = { id: string; name: string; join_code: string };
+/*
+ * Tipo con todas las estadísticas que devuelve el backend en /auth/me/stats.
+ */
+type Stats = {
+    total_checkins: number;
+    total_gastado: number;
+    total_puntos: number;
+    total_grupos: number;
+    checkins_esta_semana: number;
+    checkins_este_mes: number;
+    ultimo_checkin: string | null;
+};
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -23,8 +33,7 @@ export default function Perfil() {
     const { usuario, cerrarSesion, token } = usarAuth();
     const router = useRouter();
     const [cerrando, setCerrando] = useState(false);
-    const [checkins, setCheckins] = useState<CheckinMapa[]>([]);
-    const [grupos, setGrupos] = useState<Grupo[]>([]);
+    const [stats, setStats] = useState<Stats | null>(null);
     const [cargando, setCargando] = useState(true);
 
     useFocusEffect(
@@ -37,12 +46,8 @@ export default function Perfil() {
         if (!token) return;
         try {
             setCargando(true);
-            const [c, g] = await Promise.all([
-                hacerPeticion("/checkins/my-map", { metodo: "GET", token }),
-                hacerPeticion("/groups/my", { metodo: "GET", token }),
-            ]);
-            setCheckins(c);
-            setGrupos(g);
+            const data = await obtenerMisStats(token);
+            setStats(data);
         } catch {}
         finally { setCargando(false); }
     }
@@ -66,11 +71,11 @@ export default function Perfil() {
     if (!usuario) return null;
 
     const inicial = usuario.username.charAt(0).toUpperCase();
-    const totalGastado = checkins.filter(c => c.precio !== null).reduce((a, c) => a + Number(c.precio), 0);
-    const lugaresUnicos = new Set(checkins.map(c => `${Number(c.lat).toFixed(2)},${Number(c.lng).toFixed(2)}`)).size;
 
-    // Insignias
-    const insignias = calcularInsignias(checkins.length, totalGastado, grupos.length);
+    // Insignias calculadas a partir de las stats del backend
+    const insignias = stats
+        ? calcularInsignias(stats.total_checkins, stats.total_gastado, stats.total_grupos)
+        : [];
 
     return (
         <SafeAreaView style={s.root}>
@@ -93,21 +98,51 @@ export default function Perfil() {
                     )}
                 </View>
 
-                {/* Stats */}
+                {/* Stats principales */}
                 {cargando ? (
                     <View style={s.statsLoading}>
                         <ActivityIndicator color="#10233E" size="small" />
                     </View>
-                ) : (
+                ) : stats && (
                     <View style={s.statsRow}>
-                        <StatItem valor={checkins.length.toString()} label="cervezas" />
+                        <StatItem valor={stats.total_checkins.toString()} label="cervezas" />
                         <View style={s.statsDivider} />
-                        <StatItem valor={`${totalGastado.toFixed(0)}€`} label="gastado" />
+                        <StatItem valor={`${stats.total_gastado.toFixed(0)}€`} label="gastado" />
                         <View style={s.statsDivider} />
-                        <StatItem valor={lugaresUnicos.toString()} label="lugares" />
+                        <StatItem valor={stats.total_puntos.toString()} label="puntos" />
                         <View style={s.statsDivider} />
-                        <StatItem valor={grupos.length.toString()} label="grupos" />
+                        <StatItem valor={stats.total_grupos.toString()} label="grupos" />
                     </View>
+                )}
+
+                {/* Actividad reciente */}
+                {!cargando && stats && (
+                    <>
+                        <Text style={s.seccionLabel}>Actividad</Text>
+                        <View style={s.card}>
+                            <FilaInfo
+                                icono="calendar-outline"
+                                label="Esta semana"
+                                valor={`${stats.checkins_esta_semana} check-in${stats.checkins_esta_semana !== 1 ? "s" : ""}`}
+                            />
+                            <View style={s.cardSep} />
+                            <FilaInfo
+                                icono="stats-chart-outline"
+                                label="Este mes"
+                                valor={`${stats.checkins_este_mes} check-in${stats.checkins_este_mes !== 1 ? "s" : ""}`}
+                            />
+                            {stats.ultimo_checkin && (
+                                <>
+                                    <View style={s.cardSep} />
+                                    <FilaInfo
+                                        icono="time-outline"
+                                        label="Último"
+                                        valor={formatearFecha(stats.ultimo_checkin)}
+                                    />
+                                </>
+                            )}
+                        </View>
+                    </>
                 )}
 
                 {/* Insignias */}
@@ -175,6 +210,24 @@ export default function Perfil() {
             </ScrollView>
         </SafeAreaView>
     );
+}
+
+// ─── Utilidades ───────────────────────────────────────────────────────────────
+
+/*
+ * Formatea un string ISO de fecha a formato legible en español.
+ * Ejemplo: "2024-03-15T18:30:00+00:00" → "15 mar 2024"
+ */
+function formatearFecha(iso: string): string {
+    try {
+        return new Date(iso).toLocaleDateString("es-ES", {
+            day: "numeric",
+            month: "short",
+            year: "numeric",
+        });
+    } catch {
+        return "—";
+    }
 }
 
 // ─── Insignias ────────────────────────────────────────────────────────────────

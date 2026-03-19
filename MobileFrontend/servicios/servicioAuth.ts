@@ -115,6 +115,24 @@ export const cerrarSesionBackend = async (refreshToken: string) => {
 };
 
 /*
+ * Este método pide al backend las estadísticas de actividad
+ * del usuario autenticado.
+ *
+ * Devuelve:
+ * - total_checkins, total_gastado, total_puntos, total_grupos
+ * - checkins_esta_semana, checkins_este_mes
+ * - ultimo_checkin (ISO string o null)
+ */
+export const obtenerMisStats = async (token: string) => {
+    const respuesta = await hacerPeticion("/auth/me/stats", {
+        metodo: "GET",
+        token: token
+    });
+
+    return respuesta;
+};
+
+/*
  * Este método pide al backend los datos del usuario autenticado.
  *
  * Necesita:

@@ -30,17 +30,18 @@
 #     * audit logs + request_id + logging uniforme
 # -------------------------------------------------------------------
 
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 from fastapi import FastAPI, Depends, HTTPException, status, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 
 from .config import settings
 from .database import get_db
-from .models import User
+from .models import User, Checkin, UserPointsTotal, GroupMember
 from .schemas import RegisterRequest, LoginRequest, TokenResponse, RefreshRequest
 from .auth import (
     hash_password,
@@ -383,6 +384,87 @@ def auth_me(current_user: User = Depends(get_current_user)):
         "pais": current_user.pais,
         "ciudad": current_user.ciudad,
         "role": current_user.role,
+    }
+
+
+# -------------------------------------------------------------------
+# AUTH - ME/STATS
+# -------------------------------------------------------------------
+@app.get("/auth/me/stats")
+def auth_me_stats(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Devuelve estadísticas de actividad del usuario autenticado.
+
+    Qué incluye:
+    - total_checkins: número total de check-ins
+    - total_gastado: suma de precios de todos los check-ins
+    - total_puntos: puntos acumulados (tabla resumen)
+    - total_grupos: grupos a los que pertenece
+    - checkins_esta_semana: check-ins de los últimos 7 días
+    - checkins_este_mes: check-ins de los últimos 30 días
+    - ultimo_checkin: fecha ISO del último check-in (o null si no hay)
+
+    Seguridad:
+    - OWASP A01: protegido con get_current_user, solo ve sus propios datos
+    """
+    ahora = datetime.now(timezone.utc)
+    hace_7_dias = ahora - timedelta(days=7)
+    hace_30_dias = ahora - timedelta(days=30)
+
+    # Total de check-ins del usuario
+    total_checkins = db.query(func.count(Checkin.id)).filter(
+        Checkin.user_id == current_user.id
+    ).scalar() or 0
+
+    # Suma del precio de todos los check-ins (los que tienen precio)
+    total_gastado = db.query(
+        func.coalesce(func.sum(Checkin.precio), 0)
+    ).filter(
+        Checkin.user_id == current_user.id,
+        Checkin.precio.isnot(None)
+    ).scalar() or 0
+
+    # Puntos totales desde la tabla resumen (evitamos sumar el ledger entero)
+    puntos_row = db.query(UserPointsTotal).filter(
+        UserPointsTotal.user_id == current_user.id
+    ).first()
+    total_puntos = puntos_row.total_points if puntos_row else 0
+
+    # Número de grupos a los que pertenece el usuario
+    total_grupos = db.query(func.count(GroupMember.group_id)).filter(
+        GroupMember.user_id == current_user.id
+    ).scalar() or 0
+
+    # Check-ins de los últimos 7 días
+    checkins_esta_semana = db.query(func.count(Checkin.id)).filter(
+        Checkin.user_id == current_user.id,
+        Checkin.created_at >= hace_7_dias
+    ).scalar() or 0
+
+    # Check-ins de los últimos 30 días
+    checkins_este_mes = db.query(func.count(Checkin.id)).filter(
+        Checkin.user_id == current_user.id,
+        Checkin.created_at >= hace_30_dias
+    ).scalar() or 0
+
+    # Fecha del último check-in (null si nunca ha hecho ninguno)
+    ultimo = db.query(Checkin.created_at).filter(
+        Checkin.user_id == current_user.id
+    ).order_by(Checkin.created_at.desc()).first()
+
+    ultimo_checkin = ultimo[0].isoformat() if ultimo else None
+
+    return {
+        "total_checkins": total_checkins,
+        "total_gastado": float(total_gastado),
+        "total_puntos": total_puntos,
+        "total_grupos": total_grupos,
+        "checkins_esta_semana": checkins_esta_semana,
+        "checkins_este_mes": checkins_este_mes,
+        "ultimo_checkin": ultimo_checkin,
     }
 
 
