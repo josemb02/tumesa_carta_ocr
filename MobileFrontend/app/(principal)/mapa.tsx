@@ -19,6 +19,7 @@ import { useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { usarAuth } from "../../contexto/ContextoAuth";
 import { hacerPeticion } from "../../servicios/api";
+import { obtenerMisIconos } from "../../servicios/servicioIconos";
 import { AvatarCirculo } from "../../componentes/AvatarCirculo";
 
 type CheckinMapa = {
@@ -34,11 +35,16 @@ type Grupo = {
     join_code: string;
 };
 
-const ICONOS = [
-    { id: "Cortada",  emoji: "🍺", label: "Cortada" },
-    { id: "Entera",  emoji: "🍻", label: "Entera" },
-    { id: "refresco", emoji: "🥤", label: "Refresco" },
-];
+/*
+ * Tipo para los iconos cargados desde el API.
+ * Sustituye al array ICONOS hardcodeado.
+ */
+type IconoDisponible = {
+    id: string;
+    nombre: string;
+    emoji: string;
+    activo: boolean;
+};
 
 
 // ─── Estilo mapa mudo ─────────────────────────────────────────────────────────
@@ -220,12 +226,16 @@ function ModalCheckin({ visible, token, onCerrar, onExito }: {
     const [nota, setNota] = useState("");
     const [grupos, setGrupos] = useState<Grupo[]>([]);
     const [grupoSeleccionado, setGrupoSeleccionado] = useState<string | null>(null);
-    const [iconoSeleccionado, setIconoSeleccionado] = useState("jarra");
+    const [misIconos, setMisIconos] = useState<IconoDisponible[]>([]);
+    const [iconoSeleccionado, setIconoSeleccionado] = useState<string | null>(null);
     const [enviando, setEnviando] = useState(false);
     const [faseEnvio, setFaseEnvio] = useState("");
 
     useEffect(() => {
-        if (visible && token) cargarGrupos();
+        if (visible && token) {
+            cargarGrupos();
+            cargarIconos();
+        }
     }, [visible]);
 
     async function cargarGrupos() {
@@ -233,6 +243,20 @@ function ModalCheckin({ visible, token, onCerrar, onExito }: {
             const datos = await hacerPeticion("/groups/my", { metodo: "GET", token });
             setGrupos(datos);
         } catch { setGrupos([]); }
+    }
+
+    /*
+     * Carga los iconos que posee el usuario desde el backend.
+     * Pre-selecciona el icono marcado como activo (si hay alguno).
+     */
+    async function cargarIconos() {
+        try {
+            const datos: IconoDisponible[] = await obtenerMisIconos(token!);
+            setMisIconos(datos);
+            // Pre-seleccionamos el icono activo, o el primero disponible
+            const activo = datos.find(ic => ic.activo);
+            setIconoSeleccionado(activo ? activo.id : (datos[0]?.id ?? null));
+        } catch { setMisIconos([]); }
     }
 
     async function enviar() {
@@ -268,7 +292,10 @@ function ModalCheckin({ visible, token, onCerrar, onExito }: {
 
             await hacerPeticion("/checkins", { metodo: "POST", token, body });
 
-            setPrecio(""); setNota(""); setGrupoSeleccionado(null); setIconoSeleccionado("jarra");
+            setPrecio(""); setNota(""); setGrupoSeleccionado(null);
+            // Restauramos al icono activo (o al primero de la lista)
+            const activo = misIconos.find(ic => ic.activo);
+            setIconoSeleccionado(activo ? activo.id : (misIconos[0]?.id ?? null));
             onExito();
         } catch (e: any) {
             Alert.alert("Error", e?.message || "No se pudo registrar");
@@ -300,22 +327,26 @@ function ModalCheckin({ visible, token, onCerrar, onExito }: {
                             showsVerticalScrollIndicator={false}
                             keyboardShouldPersistTaps="handled"
                         >
-                            {/* Selector de icono */}
-                            <Text style={s.fieldLabel}>Elige tu icono</Text>
-                            <View style={s.iconosRow}>
-                                {ICONOS.map(ic => (
-                                    <Pressable
-                                        key={ic.id}
-                                        style={[s.iconoBtn, iconoSeleccionado === ic.id && s.iconoBtnActivo]}
-                                        onPress={() => setIconoSeleccionado(ic.id)}
-                                    >
-                                        <Text style={s.iconoEmoji}>{ic.emoji}</Text>
-                                        <Text style={[s.iconoLabel, iconoSeleccionado === ic.id && s.iconoLabelActivo]}>
-                                            {ic.label}
-                                        </Text>
-                                    </Pressable>
-                                ))}
-                            </View>
+                            {/* Selector de icono — cargado desde el backend */}
+                            {misIconos.length > 0 && (
+                                <>
+                                    <Text style={s.fieldLabel}>Elige tu icono</Text>
+                                    <View style={s.iconosRow}>
+                                        {misIconos.map(ic => (
+                                            <Pressable
+                                                key={ic.id}
+                                                style={[s.iconoBtn, iconoSeleccionado === ic.id && s.iconoBtnActivo]}
+                                                onPress={() => setIconoSeleccionado(ic.id)}
+                                            >
+                                                <Text style={s.iconoEmoji}>{ic.emoji}</Text>
+                                                <Text style={[s.iconoLabel, iconoSeleccionado === ic.id && s.iconoLabelActivo]}>
+                                                    {ic.nombre}
+                                                </Text>
+                                            </Pressable>
+                                        ))}
+                                    </View>
+                                </>
+                            )}
 
                             {/* Precio */}
                             <Text style={s.fieldLabel}>Precio (opcional)</Text>
@@ -492,6 +523,7 @@ const s = StyleSheet.create({
         borderColor: "#10233E",
         backgroundColor: "#10233E",
     },
+    iconoEmoji: { fontSize: 22, marginBottom: 4 },
     iconoLabel: { fontSize: 11, fontWeight: "600", color: "#6B85A8" },
     iconoLabelActivo: { color: "#FFFFFF" },
 

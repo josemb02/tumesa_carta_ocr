@@ -72,6 +72,14 @@ class User(Base):
     # Null si el usuario aún no ha subido foto.
     avatar_url = Column(String(500), nullable=True)
 
+    # Icono activo seleccionado por el usuario (FK a icons_catalog).
+    # Null = usa el primer icono gratis disponible por defecto.
+    active_icon_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("icons_catalog.id", ondelete="SET NULL"),
+        nullable=True
+    )
+
     role = Column(String(10), nullable=False, server_default="user")
     is_active = Column(Boolean, nullable=False, server_default=text("true"))
 
@@ -424,3 +432,52 @@ class RefreshToken(Base):
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
     user = relationship("User")
+
+
+# =========================================================
+# ICONS CATALOG
+# =========================================================
+# Catálogo de iconos/emoticonos disponibles en la app.
+# Los iconos de tipo 'gratis' están disponibles para todos.
+# Los de tipo 'premium' se compran con puntos.
+# =========================================================
+
+class IconCatalog(Base):
+    __tablename__ = "icons_catalog"
+
+    id           = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    nombre       = Column(String(80), nullable=False)
+    emoji        = Column(String(10), nullable=False)
+    descripcion  = Column(String(200), nullable=True)
+    coste_puntos = Column(Integer, nullable=False, server_default="0")
+    tipo         = Column(String(10), nullable=False, server_default="gratis")
+    activo       = Column(Boolean, nullable=False, server_default=text("true"))
+    created_at   = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    __table_args__ = (
+        CheckConstraint("tipo IN ('gratis', 'premium')", name="icons_catalog_tipo_chk"),
+        CheckConstraint("coste_puntos >= 0",             name="icons_catalog_coste_chk"),
+    )
+
+
+# =========================================================
+# USER OWNED ICONS
+# =========================================================
+# Iconos que ha comprado (o desbloqueado) cada usuario.
+# Los iconos gratis no necesitan entrada aquí — el código
+# de la API los considera disponibles para todos directamente.
+# =========================================================
+
+class UserOwnedIcon(Base):
+    __tablename__ = "user_owned_icons"
+
+    id           = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id      = Column(UUID(as_uuid=True), ForeignKey("users.id",          ondelete="CASCADE"), nullable=False)
+    icon_id      = Column(UUID(as_uuid=True), ForeignKey("icons_catalog.id",  ondelete="CASCADE"), nullable=False)
+    adquirido_en = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "icon_id", name="user_owned_icons_unique"),
+    )
+
+    icon = relationship("IconCatalog")

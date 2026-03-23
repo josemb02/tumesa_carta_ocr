@@ -73,6 +73,7 @@ from .routers.groups_router import router as groups_router
 from .routers.checkins_router import router as checkins_router
 from .routers.rankings_router import router as rankings_router
 from .routers.chat_router import router as chat_router
+from .routers.icons_router import router as icons_router
 
 # -------------------------------------------------------------------
 # Creación de la app principal
@@ -106,6 +107,7 @@ app.include_router(rankings_router)
 app.include_router(checkins_router)
 app.include_router(groups_router)
 app.include_router(chat_router)
+app.include_router(icons_router)
 
 
 # -------------------------------------------------------------------

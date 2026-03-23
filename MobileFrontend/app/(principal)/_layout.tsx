@@ -44,6 +44,15 @@ export default function LayoutPrincipal() {
                 }}
             />
             <Tabs.Screen
+                name="tienda"
+                options={{
+                    title: "Tienda",
+                    tabBarIcon: ({ color, size }) => (
+                        <Ionicons name="storefront-outline" size={size} color={color} />
+                    ),
+                }}
+            />
+            <Tabs.Screen
                 name="grupos"
                 options={{
                     title: "Grupos",
