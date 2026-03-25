@@ -2,18 +2,23 @@ import { useCallback, useState } from "react";
 import {
     ActivityIndicator,
     Alert,
+    KeyboardAvoidingView,
+    Modal,
+    Platform,
     Pressable,
+    RefreshControl,
     SafeAreaView,
     ScrollView,
     StyleSheet,
     Text,
+    TextInput,
     View,
 } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { usarAuth } from "../../contexto/ContextoAuth";
-import { obtenerMisStats } from "../../servicios/servicioAuth";
+import { obtenerMisStats, obtenerMisRachas, cambiarContrasena } from "../../servicios/servicioAuth";
 import { AvatarCirculo } from "../../componentes/AvatarCirculo";
 
 /*
@@ -68,6 +73,15 @@ type Stats = {
     ultimo_checkin: string | null;
 };
 
+/*
+ * Tipo con las rachas de check-ins del usuario.
+ */
+type Rachas = {
+    racha_actual: number;
+    racha_maxima: number;
+    ultimo_checkin: string | null;
+};
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function Perfil() {
@@ -75,23 +89,52 @@ export default function Perfil() {
     const router = useRouter();
     const [cerrando, setCerrando] = useState(false);
     const [subiendo, setSubiendo] = useState(false);
-    const [stats, setStats] = useState<Stats | null>(null);
+    const [stats, setStats]     = useState<Stats | null>(null);
+    const [rachas, setRachas]   = useState<Rachas | null>(null);
     const [cargando, setCargando] = useState(true);
+    // Controla el spinner del pull-to-refresh (no el de carga inicial)
+    const [refrescando, setRefrescando] = useState(false);
+    // Estado del modal de cambio de contraseña
+    const [modalPassword, setModalPassword] = useState(false);
+    const [passActual, setPassActual]       = useState("");
+    const [passNueva, setPassNueva]         = useState("");
+    const [passConfirmar, setPassConfirmar] = useState("");
+    const [cambiandoPass, setCambiandoPass] = useState(false);
 
     useFocusEffect(
         useCallback(() => {
-            cargarStats();
+            cargarTodo();
         }, [token])
     );
 
-    async function cargarStats() {
+    // Carga stats y rachas en paralelo para no hacer dos esperas secuenciales
+    async function cargarTodo() {
         if (!token) return;
         try {
             setCargando(true);
-            const data = await obtenerMisStats(token);
-            setStats(data);
+            const [dataStats, dataRachas] = await Promise.all([
+                obtenerMisStats(token),
+                obtenerMisRachas(token),
+            ]);
+            setStats(dataStats);
+            setRachas(dataRachas);
         } catch {}
         finally { setCargando(false); }
+    }
+
+    // Versión silenciosa para pull-to-refresh: no muestra el spinner de carga inicial
+    async function onRefresh() {
+        if (!token) return;
+        try {
+            setRefrescando(true);
+            const [dataStats, dataRachas] = await Promise.all([
+                obtenerMisStats(token),
+                obtenerMisRachas(token),
+            ]);
+            setStats(dataStats);
+            setRachas(dataRachas);
+        } catch {}
+        finally { setRefrescando(false); }
     }
 
     /*
@@ -126,6 +169,32 @@ export default function Perfil() {
         }
     }
 
+    async function handleCambiarPassword() {
+        if (!passNueva || !passActual) {
+            Alert.alert("Error", "Rellena todos los campos.");
+            return;
+        }
+        if (passNueva !== passConfirmar) {
+            Alert.alert("Error", "Las contraseñas nuevas no coinciden.");
+            return;
+        }
+        if (passNueva.length < 8) {
+            Alert.alert("Error", "La nueva contraseña debe tener al menos 8 caracteres.");
+            return;
+        }
+        try {
+            setCambiandoPass(true);
+            await cambiarContrasena(token!, passActual, passNueva);
+            Alert.alert("Listo", "Contraseña actualizada correctamente.");
+            setModalPassword(false);
+            setPassActual(""); setPassNueva(""); setPassConfirmar("");
+        } catch (err: any) {
+            Alert.alert("Error", err?.message || "No se pudo cambiar la contraseña.");
+        } finally {
+            setCambiandoPass(false);
+        }
+    }
+
     async function handleCerrarSesion() {
         Alert.alert("Cerrar sesión", "¿Seguro que quieres salir?", [
             { text: "Cancelar", style: "cancel" },
@@ -151,7 +220,18 @@ export default function Perfil() {
 
     return (
         <SafeAreaView style={s.root}>
-            <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+            <ScrollView
+                contentContainerStyle={s.scroll}
+                showsVerticalScrollIndicator={false}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={refrescando}
+                        onRefresh={onRefresh}
+                        tintColor="#10233E"
+                        colors={["#10233E"]}
+                    />
+                }
+            >
 
                 {/* Avatar — al pulsar se abre el selector de imagen */}
                 <View style={s.hero}>
@@ -182,6 +262,17 @@ export default function Perfil() {
                             <Ionicons name="location-outline" size={12} color="#9AAABB" />
                             <Text style={s.ubicTexto}>
                                 {[usuario.ciudad, usuario.pais].filter(Boolean).join(", ")}
+                            </Text>
+                        </View>
+                    )}
+                    {/* Fecha de nacimiento si el usuario la tiene registrada */}
+                    {usuario.fecha_nacimiento && (
+                        <View style={[s.ubicPill, { marginTop: 4 }]}>
+                            <Ionicons name="calendar-outline" size={12} color="#9AAABB" />
+                            <Text style={s.ubicTexto}>
+                                {new Date(usuario.fecha_nacimiento).toLocaleDateString("es-ES", {
+                                    day: "numeric", month: "long", year: "numeric"
+                                })}
                             </Text>
                         </View>
                     )}
@@ -230,12 +321,28 @@ export default function Perfil() {
                                     />
                                 </>
                             )}
+                            {rachas && (
+                                <>
+                                    <View style={s.cardSep} />
+                                    <FilaInfo
+                                        icono="flame-outline"
+                                        label="Racha actual"
+                                        valor={`${rachas.racha_actual} día${rachas.racha_actual !== 1 ? "s" : ""}`}
+                                    />
+                                    <View style={s.cardSep} />
+                                    <FilaInfo
+                                        icono="trophy-outline"
+                                        label="Racha máxima"
+                                        valor={`${rachas.racha_maxima} día${rachas.racha_maxima !== 1 ? "s" : ""}`}
+                                    />
+                                </>
+                            )}
                         </View>
                     </>
                 )}
 
-                {/* Insignias */}
-                {!cargando && insignias.length > 0 && (
+                {/* Insignias — siempre visibles aunque no haya ninguna ganada */}
+                {!cargando && stats && (
                     <>
                         <Text style={s.seccionLabel}>Logros</Text>
                         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.insigniasScroll}>
@@ -245,8 +352,8 @@ export default function Perfil() {
                                     <Text style={s.insigniaNombre}>{ins.nombre}</Text>
                                 </View>
                             ))}
-                            {/* Insignias bloqueadas */}
-                            {TODAS_INSIGNIAS.filter(i => !insignias.find(u => u.id === i.id)).slice(0, 3).map(ins => (
+                            {/* Insignias bloqueadas: muestra las que aún no tiene */}
+                            {TODAS_INSIGNIAS.filter(i => !insignias.find(u => u.id === i.id)).slice(0, 4).map(ins => (
                                 <View key={ins.id} style={[s.insignia, s.insigniaBloqueada]}>
                                     <Text style={[s.insigniaEmoji, { opacity: 0.2 }]}>{ins.emoji}</Text>
                                     <Text style={[s.insigniaNombre, s.insigniaNombreBloq]}>???</Text>
@@ -266,6 +373,17 @@ export default function Perfil() {
                         <View style={s.cardSep} />
                         <FilaInfo icono="shield-checkmark-outline" label="Rol" valor={usuario.role} />
                     </>}
+                    <View style={s.cardSep} />
+                    <Pressable
+                        style={({ pressed }) => [s.filaInfo, pressed && { opacity: 0.6 }]}
+                        onPress={() => setModalPassword(true)}
+                    >
+                        <View style={s.filaIcono}>
+                            <Ionicons name="lock-closed-outline" size={16} color="#6B85A8" />
+                        </View>
+                        <Text style={[s.filaLabel, { flex: 1 }]}>Cambiar contraseña</Text>
+                        <Ionicons name="chevron-forward" size={16} color="#C0BAB0" />
+                    </Pressable>
                 </View>
 
                 {/* Info ubicación */}
@@ -297,6 +415,63 @@ export default function Perfil() {
 
                 <Text style={s.version}>BeerMap v1.0</Text>
             </ScrollView>
+
+            {/* Modal cambiar contraseña */}
+            <Modal visible={modalPassword} animationType="slide" transparent onRequestClose={() => setModalPassword(false)}>
+                <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
+                    <Pressable style={s.passOverlay} onPress={() => setModalPassword(false)} />
+                    <View style={s.passSheet}>
+                        <Text style={s.passTitulo}>Cambiar contraseña</Text>
+
+                        <TextInput
+                            style={s.passInput}
+                            placeholder="Contraseña actual"
+                            placeholderTextColor="#9AAABB"
+                            secureTextEntry
+                            value={passActual}
+                            onChangeText={setPassActual}
+                            editable={!cambiandoPass}
+                        />
+                        <TextInput
+                            style={s.passInput}
+                            placeholder="Nueva contraseña"
+                            placeholderTextColor="#9AAABB"
+                            secureTextEntry
+                            value={passNueva}
+                            onChangeText={setPassNueva}
+                            editable={!cambiandoPass}
+                        />
+                        <TextInput
+                            style={s.passInput}
+                            placeholder="Confirmar nueva contraseña"
+                            placeholderTextColor="#9AAABB"
+                            secureTextEntry
+                            value={passConfirmar}
+                            onChangeText={setPassConfirmar}
+                            editable={!cambiandoPass}
+                        />
+
+                        <Pressable
+                            style={({ pressed }) => [s.passBtn, pressed && { opacity: 0.75 }]}
+                            onPress={handleCambiarPassword}
+                            disabled={cambiandoPass}
+                        >
+                            {cambiandoPass
+                                ? <ActivityIndicator color="#FFFFFF" size="small" />
+                                : <Text style={s.passBtnTexto}>Guardar cambios</Text>
+                            }
+                        </Pressable>
+
+                        <Pressable
+                            style={({ pressed }) => [s.passCancelar, pressed && { opacity: 0.6 }]}
+                            onPress={() => { setModalPassword(false); setPassActual(""); setPassNueva(""); setPassConfirmar(""); }}
+                            disabled={cambiandoPass}
+                        >
+                            <Text style={s.passCancelarTexto}>Cancelar</Text>
+                        </Pressable>
+                    </View>
+                </KeyboardAvoidingView>
+            </Modal>
         </SafeAreaView>
     );
 }
@@ -451,4 +626,29 @@ const s = StyleSheet.create({
     btnSalirPress: { opacity: 0.7 },
     btnSalirTexto: { fontSize: 15, fontWeight: "600", color: "#E53E3E" },
     version: { fontSize: 12, color: "#C0BAB0", textAlign: "center" },
+
+    // Modal cambiar contraseña
+    passOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.4)" },
+    passSheet: {
+        backgroundColor: "#FFFFFF",
+        borderTopLeftRadius: 20, borderTopRightRadius: 20,
+        padding: 24, paddingBottom: 40, gap: 12,
+    },
+    passTitulo: { fontSize: 18, fontWeight: "700", color: "#10233E", marginBottom: 4 },
+    passInput: {
+        height: 48, borderRadius: 12,
+        backgroundColor: "#F7F4EC",
+        paddingHorizontal: 16,
+        fontSize: 15, color: "#10233E",
+        borderWidth: 1, borderColor: "#E8E4DC",
+    },
+    passBtn: {
+        height: 52, borderRadius: 14,
+        backgroundColor: "#10233E",
+        justifyContent: "center", alignItems: "center",
+        marginTop: 4,
+    },
+    passBtnTexto: { fontSize: 15, fontWeight: "700", color: "#FFFFFF" },
+    passCancelar: { alignItems: "center", paddingVertical: 10 },
+    passCancelarTexto: { fontSize: 14, color: "#9AAABB" },
 });

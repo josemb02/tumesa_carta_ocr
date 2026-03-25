@@ -49,6 +49,20 @@ const PAISES = [
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+/*
+ * Traduce errores técnicos del backend a mensajes en español natural.
+ */
+function mensajeAmigable(e: any): string {
+    const raw = (e?.message ?? "").toLowerCase();
+    if (raw.includes("network request failed") || raw.includes("failed to fetch") || raw.includes("network error")) {
+        return "Sin conexión. Comprueba tu internet";
+    }
+    if (raw.includes("ya existe") || raw.includes("already") || raw.includes("duplicate")) {
+        return "Este email ya está registrado";
+    }
+    return e?.message || "No se ha podido crear la cuenta";
+}
+
 function validarEmail(email: string): boolean {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
 }
@@ -152,7 +166,7 @@ export default function Registro() {
             );
             router.replace("/(principal)/mapa");
         } catch (error: any) {
-            Alert.alert("Error", error?.message || "No se ha podido crear la cuenta");
+            Alert.alert("Error", mensajeAmigable(error));
         } finally {
             setCargando(false);
         }
@@ -356,49 +370,56 @@ export default function Registro() {
 
             {/* Modal país */}
             <Modal visible={modalPais} animationType="slide" transparent>
-                <View style={styles.modalOverlay}>
-                    <View style={styles.modalContenedor}>
-                        <View style={styles.modalCabecera}>
-                            <Text style={styles.modalTitulo}>Selecciona tu país</Text>
-                            <Pressable onPress={() => { setModalPais(false); setBusquedaPais(""); }}>
-                                <Text style={styles.modalCerrar}>✕</Text>
-                            </Pressable>
-                        </View>
-                        <TextInput
-                            value={busquedaPais}
-                            onChangeText={setBusquedaPais}
-                            placeholder="Buscar país..."
-                            placeholderTextColor="#8A8A8A"
-                            style={styles.busquedaInput}
-                            autoFocus
-                        />
-                        <FlatList
-                            data={paisesFiltrados}
-                            keyExtractor={(item) => item}
-                            renderItem={({ item }) => (
-                                <Pressable
-                                    style={({ pressed }) => [
-                                        styles.itemPais,
-                                        item === pais && styles.itemPaisSeleccionado,
-                                        pressed && styles.itemPaisPulsado
-                                    ]}
-                                    onPress={() => {
-                                        setPais(item);
-                                        setBusquedaPais("");
-                                        setModalPais(false);
-                                    }}
-                                >
-                                    <Text style={[styles.itemPaisTexto, item === pais && styles.itemPaisTextoSeleccionado]}>
-                                        {item}
-                                    </Text>
-                                    {item === pais && <Text style={styles.checkmark}>✓</Text>}
+                {/* KeyboardAvoidingView empuja el modal hacia arriba cuando
+                    el teclado aparece, evitando que tape el buscador */}
+                <KeyboardAvoidingView
+                    style={{ flex: 1 }}
+                    behavior={Platform.OS === "ios" ? "padding" : "height"}
+                >
+                    <View style={styles.modalOverlay}>
+                        <View style={styles.modalContenedor}>
+                            <View style={styles.modalCabecera}>
+                                <Text style={styles.modalTitulo}>Selecciona tu país</Text>
+                                <Pressable onPress={() => { setModalPais(false); setBusquedaPais(""); }}>
+                                    <Text style={styles.modalCerrar}>✕</Text>
                                 </Pressable>
-                            )}
-                            keyboardShouldPersistTaps="handled"
-                            showsVerticalScrollIndicator={false}
-                        />
+                            </View>
+                            <TextInput
+                                value={busquedaPais}
+                                onChangeText={setBusquedaPais}
+                                placeholder="Buscar país..."
+                                placeholderTextColor="#8A8A8A"
+                                style={styles.busquedaInput}
+                                autoFocus
+                            />
+                            <FlatList
+                                data={paisesFiltrados}
+                                keyExtractor={(item) => item}
+                                renderItem={({ item }) => (
+                                    <Pressable
+                                        style={({ pressed }) => [
+                                            styles.itemPais,
+                                            item === pais && styles.itemPaisSeleccionado,
+                                            pressed && styles.itemPaisPulsado
+                                        ]}
+                                        onPress={() => {
+                                            setPais(item);
+                                            setBusquedaPais("");
+                                            setModalPais(false);
+                                        }}
+                                    >
+                                        <Text style={[styles.itemPaisTexto, item === pais && styles.itemPaisTextoSeleccionado]}>
+                                            {item}
+                                        </Text>
+                                        {item === pais && <Text style={styles.checkmark}>✓</Text>}
+                                    </Pressable>
+                                )}
+                                keyboardShouldPersistTaps="handled"
+                                showsVerticalScrollIndicator={false}
+                            />
+                        </View>
                     </View>
-                </View>
+                </KeyboardAvoidingView>
             </Modal>
 
             {/* Modal fecha */}

@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { ActivityIndicator, StyleSheet, View } from "react-native";
+import { Image, StyleSheet, View } from "react-native";
 import { useRouter } from "expo-router";
 import { usarAuth } from "../contexto/ContextoAuth";
 
@@ -30,11 +30,16 @@ export default function Index() {
         }, 3000);
 
         return () => clearTimeout(timeout);
-    }, []);
+    }, [router]);
 
     return (
         <View style={styles.contenedor}>
-            <ActivityIndicator size="large" color="#10233E" />
+            {/* Logo de BeerMap como pantalla de carga */}
+            <Image
+                source={require("../assets/imagenes/BeerMap_marca_Logo.png")}
+                style={styles.logo}
+                resizeMode="contain"
+            />
         </View>
     );
 }
@@ -44,6 +49,10 @@ const styles = StyleSheet.create({
         flex: 1,
         justifyContent: "center",
         alignItems: "center",
-        backgroundColor: "#F7F4EC"
-    }
+        backgroundColor: "#F7F4EC",
+    },
+    logo: {
+        width: 240,
+        height: 140,
+    },
 });

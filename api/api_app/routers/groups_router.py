@@ -29,6 +29,7 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..models import Group, GroupMember, User
+from ..notificaciones import enviar_notificacion_a_usuario
 from ..schemas import CreateGroupRequest, JoinGroupRequest, GroupResponse
 from ..auth import get_current_user
 from ..audit import write_audit_log
@@ -173,6 +174,15 @@ def unirse_a_grupo(
     db.add(miembro)
     db.commit()
 
+    # Notificar al propietario del grupo
+    enviar_notificacion_a_usuario(
+        user_id=grupo.owner_id,
+        titulo="Nuevo miembro en tu grupo 👥",
+        mensaje=f"{current_user.username} se ha unido a {grupo.name}.",
+        datos={"tipo": "nuevo_miembro", "group_id": str(grupo.id)},
+        db=db,
+    )
+
     write_audit_log(
         db=db,
         action="group_join",
@@ -247,8 +257,10 @@ def listar_miembros_grupo(
 
     for user in miembros:
         respuesta.append({
-            "id": user.id,
-            "username": user.username
+            "id": str(user.id),
+            "username": user.username,
+            # avatar_url es público: todos los miembros del grupo pueden verlo
+            "avatar_url": user.avatar_url,
         })
 
     return respuesta

@@ -27,6 +27,7 @@ from ..audit import write_audit_log
 from ..auth import get_current_user
 from ..database import get_db
 from ..models import Group, GroupMember, GroupMessage, User
+from ..notificaciones import enviar_notificacion_a_usuario
 from ..schemas import MessageResponse, SendMessageRequest
 
 
@@ -141,6 +142,24 @@ def enviar_mensaje_grupo(
     db.commit()
     db.refresh(mensaje)
 
+    # Notificar a los demás miembros del grupo
+    grupo = db.query(Group).filter(Group.id == group_id).first()
+    nombre_grupo = grupo.name if grupo else "Grupo"
+
+    miembros = db.query(GroupMember).filter(
+        GroupMember.group_id == group_id,
+        GroupMember.user_id != current_user.id,
+    ).all()
+
+    for miembro in miembros:
+        enviar_notificacion_a_usuario(
+            user_id=miembro.user_id,
+            titulo=nombre_grupo,
+            mensaje=f"{current_user.username}: {mensaje_limpio[:80]}",
+            datos={"tipo": "mensaje_grupo", "group_id": str(group_id)},
+            db=db,
+        )
+
     # ---------------------------------------------------------------
     # Se registra auditoría
     # ---------------------------------------------------------------
@@ -158,6 +177,7 @@ def enviar_mensaje_grupo(
         id=mensaje.id,
         user_id=mensaje.user_id,
         message=mensaje.message,
+        created_at=mensaje.created_at,
     )
 
 
@@ -208,6 +228,7 @@ def listar_mensajes_grupo(
                 id=mensaje.id,
                 user_id=mensaje.user_id,
                 message=mensaje.message,
+                created_at=mensaje.created_at,
             )
         )
 

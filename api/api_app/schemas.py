@@ -2,7 +2,7 @@ from pydantic import BaseModel, EmailStr, Field
 from typing import Optional
 from uuid import UUID
 from decimal import Decimal
-from datetime import date
+from datetime import date, datetime
 
 
 # =========================================================
@@ -67,6 +67,14 @@ class RefreshRequest(BaseModel):
     refresh_token: str
 
 
+class GoogleAuthRequest(BaseModel):
+    """
+    id_token de Google obtenido en el cliente tras el flujo OAuth.
+    El backend lo verifica contra la API de Google.
+    """
+    id_token: str
+
+
 class AvatarUpdateRequest(BaseModel):
     """
     URL pública de Cloudinary con la nueva foto de perfil.
@@ -75,6 +83,15 @@ class AvatarUpdateRequest(BaseModel):
     la guarde en la BD.
     """
     avatar_url: str = Field(min_length=10, max_length=500)
+
+
+class ChangePasswordRequest(BaseModel):
+    """
+    Datos para cambiar la contraseña del usuario autenticado.
+    Se requiere la contraseña actual para evitar cambios no autorizados.
+    """
+    password_actual: str = Field(min_length=1, max_length=128)
+    password_nuevo: str = Field(min_length=8, max_length=128)
 
 
 # =========================================================
@@ -122,6 +139,12 @@ class CreateCheckinRequest(BaseModel):
 
     note: Optional[str] = Field(default=None, max_length=180)
 
+    # URL pública de Cloudinary de la foto del check-in (opcional)
+    foto_url: Optional[str] = Field(default=None, max_length=500)
+
+    # Emoji del icono seleccionado (máx. 10 chars para admitir emojis compuestos)
+    icon_emoji: Optional[str] = Field(default=None, max_length=10)
+
 
 class CheckinResponse(BaseModel):
     """
@@ -132,16 +155,22 @@ class CheckinResponse(BaseModel):
     lng: Decimal
     precio: Optional[Decimal]
     note: Optional[str]
+    foto_url: Optional[str]
+    icon_emoji: Optional[str]
 
 
 class MapCheckinResponse(BaseModel):
     """
     Check-in simplificado para pintar el mapa del usuario.
+    Incluye nota, foto e icono para mostrar el detalle al pulsar un marker.
     """
     id: UUID
     lat: Decimal
     lng: Decimal
     precio: Optional[Decimal]
+    note: Optional[str]
+    foto_url: Optional[str]
+    icon_emoji: Optional[str]
 
 
 # =========================================================
@@ -158,10 +187,12 @@ class SendMessageRequest(BaseModel):
 class MessageResponse(BaseModel):
     """
     Mensaje del chat de grupo.
+    Incluye created_at para que el frontend muestre la hora del mensaje.
     """
     id: UUID
     user_id: UUID
     message: str
+    created_at: datetime
 
 
 # =========================================================
@@ -171,7 +202,12 @@ class MessageResponse(BaseModel):
 class RankingEntry(BaseModel):
     """
     Entrada individual del ranking.
+    Incluye los datos públicos del usuario (avatar, ubicación)
+    para que el frontend pueda mostrar fotos y mini-perfiles.
     """
     user_id: UUID
     username: str
     points: int
+    avatar_url: Optional[str] = None
+    ciudad: Optional[str] = None
+    pais: Optional[str] = None

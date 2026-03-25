@@ -7,8 +7,10 @@ import {
     Modal,
     Platform,
     Pressable,
+    RefreshControl,
     SafeAreaView,
     ScrollView,
+    Share,
     StyleSheet,
     Text,
     TextInput,
@@ -21,11 +23,38 @@ import { hacerPeticion } from "../../servicios/api";
 import { AvatarCirculo } from "../../componentes/AvatarCirculo";
 
 type Grupo = { id: string; name: string; join_code: string };
-type Miembro = { id: string; username: string };
-type Mensaje = { id: string; user_id: string; message: string };
-type RankingEntrada = { user_id: string; username: string; points: number };
+type Miembro = { id: string; username: string; avatar_url: string | null };
+type Mensaje = { id: string; user_id: string; message: string; created_at: string };
+type RankingEntrada = { user_id: string; username: string; points: number; avatar_url: string | null };
 type TabDetalle = "miembros" | "ranking" | "chat";
 type ModalTipo = "crear" | "unirse" | null;
+
+// ─── Utilidades ───────────────────────────────────────────────────────────────
+
+/*
+ * Formatea un ISO timestamp a "HH:MM" si el mensaje es de hoy,
+ * o a "DD/MM HH:MM" si es de otro día.
+ * Usa la zona horaria local del dispositivo.
+ */
+function formatearHora(iso: string): string {
+    try {
+        const d = new Date(iso);
+        const hoy = new Date();
+        const mismodia =
+            d.getDate() === hoy.getDate() &&
+            d.getMonth() === hoy.getMonth() &&
+            d.getFullYear() === hoy.getFullYear();
+        const hora = d.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
+        if (mismodia) return hora;
+        return (
+            d.toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit" }) +
+            " " +
+            hora
+        );
+    } catch {
+        return "";
+    }
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -33,6 +62,8 @@ export default function Grupos() {
     const { token } = usarAuth();
     const [grupos, setGrupos] = useState<Grupo[]>([]);
     const [cargando, setCargando] = useState(true);
+    // Spinner del pull-to-refresh (no tapa la pantalla como el de carga inicial)
+    const [refrescando, setRefrescando] = useState(false);
     const [grupoActivo, setGrupoActivo] = useState<Grupo | null>(null);
     const [modal, setModal] = useState<ModalTipo>(null);
 
@@ -46,6 +77,17 @@ export default function Grupos() {
             setGrupos(datos);
         } catch { setGrupos([]); }
         finally { setCargando(false); }
+    }
+
+    // Versión silenciosa para pull-to-refresh
+    async function onRefresh() {
+        if (!token) return;
+        setRefrescando(true);
+        try {
+            const datos = await hacerPeticion("/groups/my", { metodo: "GET", token });
+            setGrupos(datos);
+        } catch { setGrupos([]); }
+        finally { setRefrescando(false); }
     }
 
     // Vista detalle grupo
@@ -97,6 +139,14 @@ export default function Grupos() {
                     keyExtractor={i => i.id}
                     contentContainerStyle={s.lista}
                     showsVerticalScrollIndicator={false}
+                    refreshControl={
+                        <RefreshControl
+                            refreshing={refrescando}
+                            onRefresh={onRefresh}
+                            tintColor="#10233E"
+                            colors={["#10233E"]}
+                        />
+                    }
                     renderItem={({ item }) => (
                         <Pressable style={s.grupoCard} onPress={() => setGrupoActivo(item)}>
                             <View style={s.grupoAvatar}>
@@ -137,10 +187,25 @@ function DetalleGrupo({ grupo, token, onVolver }: {
     const [mensajes, setMensajes] = useState<Mensaje[]>([]);
     const [mensaje, setMensaje] = useState("");
     const [cargando, setCargando] = useState(true);
+    const [refrescando, setRefrescando] = useState(false);
     const [enviando, setEnviando] = useState(false);
     const flatRef = useRef<FlatList>(null);
 
     useEffect(() => { cargarTodo(); }, []);
+
+    // Pull-to-refresh silencioso para las tabs de miembros y ranking
+    async function onRefresh() {
+        setRefrescando(true);
+        try {
+            const [m, r] = await Promise.all([
+                hacerPeticion(`/groups/${grupo.id}/members`, { metodo: "GET", token }),
+                hacerPeticion(`/rankings/group/${grupo.id}`, { metodo: "GET", token }),
+            ]);
+            setMiembros(m);
+            setRanking(r);
+        } catch {}
+        finally { setRefrescando(false); }
+    }
 
     async function cargarTodo() {
         setCargando(true);
@@ -182,7 +247,15 @@ function DetalleGrupo({ grupo, token, onVolver }: {
                 </Pressable>
                 <View style={s.detalleHeaderInfo}>
                     <Text style={s.detalleTitulo}>{grupo.name}</Text>
-                    <Text style={s.detalleCodigo}>{grupo.join_code}</Text>
+                    {/* Al pulsar el código se abre el Share sheet nativo para copiarlo o compartirlo */}
+                    <Pressable
+                        style={({ pressed }) => [s.detalleCodigoRow, pressed && { opacity: 0.6 }]}
+                        onPress={() => Share.share({ message: grupo.join_code })}
+                        hitSlop={8}
+                    >
+                        <Text style={s.detalleCodigo}>{grupo.join_code}</Text>
+                        <Ionicons name="copy-outline" size={11} color="#9AAABB" />
+                    </Pressable>
                 </View>
             </View>
 
@@ -217,7 +290,7 @@ function DetalleGrupo({ grupo, token, onVolver }: {
                                 onContentSizeChange={() => flatRef.current?.scrollToEnd()}
                                 ListEmptyComponent={
                                     <View style={s.chatVacio}>
-                                        <Text style={s.chatVacioTexto}>Aún no hay mensajes</Text>
+                                        <Text style={s.chatVacioTexto}>Sé el primero en escribir algo 👋</Text>
                                     </View>
                                 }
                                 renderItem={({ item }) => {
@@ -230,6 +303,10 @@ function DetalleGrupo({ grupo, token, onVolver }: {
                                             )}
                                             <Text style={[s.burbujaTexto, esMio && s.burbujaTextoProp]}>
                                                 {item.message}
+                                            </Text>
+                                            {/* Hora del mensaje alineada a la derecha de la burbuja */}
+                                            <Text style={[s.burbujaHora, esMio && s.burbujaHoraProp]}>
+                                                {formatearHora(item.created_at)}
                                             </Text>
                                         </View>
                                     );
@@ -266,14 +343,22 @@ function DetalleGrupo({ grupo, token, onVolver }: {
                             keyExtractor={r => r.user_id}
                             contentContainerStyle={s.lista}
                             showsVerticalScrollIndicator={false}
+                            refreshControl={
+                                <RefreshControl
+                                    refreshing={refrescando}
+                                    onRefresh={onRefresh}
+                                    tintColor="#10233E"
+                                    colors={["#10233E"]}
+                                />
+                            }
                             renderItem={({ item, index }) => {
                                 const esMio = item.user_id === usuario?.id;
                                 return (
                                     <View style={[s.rankFila, esMio && s.rankFilaMia]}>
                                         <Text style={s.rankPos}>{String(index + 1).padStart(2, "0")}</Text>
-                                        {/* marginRight separa el avatar del nombre */}
+                                        {/* Foto real de cada miembro del ranking */}
                                         <AvatarCirculo
-                                            uri={esMio ? usuario?.avatar_url : null}
+                                            uri={item.avatar_url}
                                             username={item.username}
                                             size={36}
                                             colorFondo={esMio ? "#10233E" : "#E2E8F0"}
@@ -296,13 +381,21 @@ function DetalleGrupo({ grupo, token, onVolver }: {
                             keyExtractor={m => m.id}
                             contentContainerStyle={s.lista}
                             showsVerticalScrollIndicator={false}
+                            refreshControl={
+                                <RefreshControl
+                                    refreshing={refrescando}
+                                    onRefresh={onRefresh}
+                                    tintColor="#10233E"
+                                    colors={["#10233E"]}
+                                />
+                            }
                             renderItem={({ item }) => {
                                 const esMio = item.id === usuario?.id;
                                 return (
                                     <View style={s.miembroFila}>
-                                        {/* marginRight separa el avatar del nombre */}
+                                        {/* Foto real de cada miembro del grupo */}
                                         <AvatarCirculo
-                                            uri={esMio ? usuario?.avatar_url : null}
+                                            uri={item.avatar_url}
                                             username={item.username}
                                             size={40}
                                             colorFondo={esMio ? "#10233E" : "#F0EDE6"}
@@ -454,7 +547,8 @@ const s = StyleSheet.create({
     volverBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: "#FFFFFF", justifyContent: "center", alignItems: "center", borderWidth: 1, borderColor: "#E2E8F0" },
     detalleHeaderInfo: { flex: 1 },
     detalleTitulo: { fontSize: 18, fontWeight: "700", color: "#10233E", letterSpacing: -0.3 },
-    detalleCodigo: { fontSize: 11, color: "#9AAABB", marginTop: 1 },
+    detalleCodigoRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 1 },
+    detalleCodigo: { fontSize: 11, color: "#9AAABB" },
 
     detalleTabs: { flexDirection: "row", marginHorizontal: 24, marginBottom: 16, backgroundColor: "#EEEBE3", borderRadius: 12, padding: 3 },
     detalleTab: { flex: 1, paddingVertical: 8, borderRadius: 10, alignItems: "center" },
@@ -472,6 +566,9 @@ const s = StyleSheet.create({
     burbujaAutor: { fontSize: 11, fontWeight: "600", color: "#9AAABB", marginBottom: 3 },
     burbujaTexto: { fontSize: 14, color: "#10233E", lineHeight: 20 },
     burbujaTextoProp: { color: "#FFFFFF" },
+    // Hora pequeña debajo del texto, alineada al lado derecho de la burbuja
+    burbujaHora: { fontSize: 10, color: "#B0BAC8", marginTop: 4, alignSelf: "flex-end" },
+    burbujaHoraProp: { color: "rgba(255,255,255,0.55)" },
     chatInput: { flexDirection: "row", alignItems: "flex-end", paddingHorizontal: 16, paddingVertical: 10, borderTopWidth: 1, borderTopColor: "#F0EDE6", backgroundColor: "#F7F4EC", gap: 10 },
     chatTextInput: { flex: 1, minHeight: 40, maxHeight: 100, borderWidth: 1, borderColor: "#E2E8F0", borderRadius: 20, paddingHorizontal: 16, paddingVertical: 10, fontSize: 14, color: "#10233E", backgroundColor: "#FFFFFF" },
     chatEnviar: { width: 40, height: 40, borderRadius: 20, backgroundColor: "#10233E", justifyContent: "center", alignItems: "center" },

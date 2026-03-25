@@ -245,6 +245,11 @@ class Checkin(Base):
     precio = Column(Numeric(6, 2), nullable=True)
 
     note = Column(String(180), nullable=True)
+    # URL pública de Cloudinary de la foto asociada al check-in (opcional)
+    foto_url = Column(String(500), nullable=True)
+    # Emoji del icono elegido en el momento del check-in.
+    # Se guarda desnormalizado para no depender de map_icons (que no tiene emoji).
+    icon_emoji = Column(String(10), nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
     __table_args__ = (

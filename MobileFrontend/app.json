@@ -4,7 +4,7 @@
     "slug": "MobileFrontend",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/BeerMap_APP_logo.png",
+    "icon": "./assets/imagenes/BeerMap_APP_logo.png",
     "scheme": "beermap",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -19,14 +19,14 @@
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/images/BeerMap_APP_logo.png"
+      "favicon": "./assets/imagenes/BeerMap_APP_logo.png"
     },
     "plugins": [
       "expo-router",
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/BeerMap_APP_logo.png",
+          "image": "./assets/imagenes/BeerMap_APP_logo.png",
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff",
@@ -34,7 +34,8 @@
             "backgroundColor": "#000000"
           }
         }
-      ]
+      ],
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,

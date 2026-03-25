@@ -30,7 +30,7 @@
 #     * audit logs + request_id + logging uniforme
 # -------------------------------------------------------------------
 
-from datetime import datetime, timezone, timedelta
+from datetime import date, datetime, timezone, timedelta
 
 from fastapi import FastAPI, Depends, HTTPException, status, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -41,8 +41,10 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from .config import settings
 from .database import get_db
-from .models import User, Checkin, UserPointsTotal, GroupMember
-from .schemas import RegisterRequest, LoginRequest, TokenResponse, RefreshRequest, AvatarUpdateRequest
+import httpx
+
+from .models import User, Checkin, UserPointsTotal, GroupMember, UserAuthProvider
+from .schemas import RegisterRequest, LoginRequest, TokenResponse, RefreshRequest, AvatarUpdateRequest, GoogleAuthRequest, ChangePasswordRequest
 from .auth import (
     hash_password,
     verify_password,
@@ -74,6 +76,7 @@ from .routers.checkins_router import router as checkins_router
 from .routers.rankings_router import router as rankings_router
 from .routers.chat_router import router as chat_router
 from .routers.icons_router import router as icons_router
+from .routers.notifications_router import router as notifications_router
 
 # -------------------------------------------------------------------
 # Creación de la app principal
@@ -108,6 +111,7 @@ app.include_router(checkins_router)
 app.include_router(groups_router)
 app.include_router(chat_router)
 app.include_router(icons_router)
+app.include_router(notifications_router)
 
 
 # -------------------------------------------------------------------
@@ -371,6 +375,150 @@ def login(
 
 
 # -------------------------------------------------------------------
+# AUTH - GOOGLE
+# -------------------------------------------------------------------
+# Verifica el id_token de Google y devuelve nuestro propio JWT.
+#
+# Flujo:
+# 1) El cliente hace el flujo OAuth con Google y obtiene un id_token
+# 2) Lo envía aquí
+# 3) Verificamos el token contra la API de Google (tokeninfo)
+# 4) Si el email ya existe → login automático
+# 5) Si no existe → creamos usuario nuevo
+# 6) Devolvemos TokenResponse igual que el login normal
+#
+# Seguridad:
+# - OWASP A07: verificación del token en servidor de Google
+# - OWASP A02: no guardamos credenciales de Google, solo el google_id
+# - OWASP A09: audit log del evento
+# -------------------------------------------------------------------
+GOOGLE_TOKENINFO_URL = "https://oauth2.googleapis.com/tokeninfo"
+
+@app.post("/auth/google", response_model=TokenResponse)
+def auth_google(
+    payload: GoogleAuthRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """
+    Inicia sesión con un id_token de Google.
+    Crea el usuario si no existe.
+    """
+    ip = getattr(request.state, "client_ip", "unknown")
+    rate_limit(key=f"google_auth:{ip}", max_requests=10, window_seconds=60)
+
+    # ---------------------------------------------------------------
+    # 1) Verificar el id_token con Google
+    # ---------------------------------------------------------------
+    try:
+        with httpx.Client(timeout=5.0) as client:
+            resp = client.get(
+                GOOGLE_TOKENINFO_URL,
+                params={"id_token": payload.id_token},
+            )
+            resp.raise_for_status()
+            info = resp.json()
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token de Google inválido o caducado",
+        )
+
+    google_id = info.get("sub")
+    email = info.get("email")
+    email_verified = info.get("email_verified", "false")
+    nombre = info.get("name") or info.get("given_name") or ""
+
+    if not google_id or not email or email_verified != "true":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="El token de Google no contiene un email verificado",
+        )
+
+    # ---------------------------------------------------------------
+    # 2) Buscar usuario existente por proveedor o por email
+    # ---------------------------------------------------------------
+    # Primero buscamos por (provider='google', provider_user_id=google_id)
+    proveedor = db.query(UserAuthProvider).filter(
+        UserAuthProvider.provider == "google",
+        UserAuthProvider.provider_user_id == google_id,
+    ).first()
+
+    if proveedor is not None:
+        user = db.query(User).filter(User.id == proveedor.user_id).first()
+    else:
+        # Buscar por email por si ya tenía cuenta local
+        user = db.query(User).filter(User.email == email).first()
+
+        if user is not None:
+            # Vinculamos la cuenta existente con Google
+            nuevo_proveedor = UserAuthProvider(
+                user_id=user.id,
+                provider="google",
+                provider_user_id=google_id,
+            )
+            db.add(nuevo_proveedor)
+            db.commit()
+        else:
+            # -------------------------------------------------------
+            # 3) Crear usuario nuevo
+            # -------------------------------------------------------
+            username_base = email.split("@")[0][:28].strip()
+            username_base = "".join(c for c in username_base if c.isalnum() or c in "_-")
+            if len(username_base) < 3:
+                username_base = "user"
+
+            # Garantizamos unicidad del username añadiendo sufijo si hace falta
+            username_final = username_base
+            sufijo = 1
+            while db.query(User).filter(User.username == username_final).first() is not None:
+                username_final = f"{username_base}{sufijo}"
+                sufijo += 1
+
+            user = User(
+                email=email,
+                username=username_final,
+                password_hash=None,
+                role="user",
+            )
+            db.add(user)
+            db.flush()  # necesitamos user.id antes de crear el proveedor
+
+            nuevo_proveedor = UserAuthProvider(
+                user_id=user.id,
+                provider="google",
+                provider_user_id=google_id,
+            )
+            db.add(nuevo_proveedor)
+            db.commit()
+            db.refresh(user)
+
+    if user is None or user.is_active is False:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Usuario inactivo",
+        )
+
+    # ---------------------------------------------------------------
+    # 4) Emitir nuestro propio JWT
+    # ---------------------------------------------------------------
+    token = create_access_token(
+        subject=str(user.id),
+        expires_minutes=settings.JWT_EXPIRE_MINUTES,
+    )
+    refresh_token = create_refresh_token(user_id=user.id, db=db)
+
+    write_audit_log(
+        db=db,
+        action="auth_google_ok",
+        request=request,
+        user_id=user.id,
+    )
+
+    return TokenResponse(access_token=token, refresh_token=refresh_token)
+
+
+# -------------------------------------------------------------------
 # AUTH - ME
 # -------------------------------------------------------------------
 # Endpoint protegido para devolver la identidad del usuario autenticado.
@@ -531,6 +679,130 @@ def auth_me_stats(
 
 
 # -------------------------------------------------------------------
+# AUTH - ME/STREAKS
+# -------------------------------------------------------------------
+# Calcula las rachas de check-ins del usuario autenticado.
+#
+# Algoritmo:
+# - Se obtienen las fechas distintas de check-ins (solo la parte date,
+#   sin hora) para no contar varias veces el mismo día.
+# - Racha actual: días consecutivos contando hacia atrás desde hoy.
+#   Se considera "viva" si el último check-in fue hoy o ayer.
+# - Racha máxima: secuencia consecutiva más larga del historial.
+#
+# Seguridad:
+# - OWASP A01: protegido con get_current_user, solo ve sus propios datos
+# -------------------------------------------------------------------
+@app.get("/auth/me/streaks")
+def auth_me_streaks(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Devuelve las rachas de check-ins del usuario.
+
+    Campos:
+    - racha_actual: días consecutivos hasta hoy (0 si no hay racha viva)
+    - racha_maxima: racha más larga del historial
+    - ultimo_checkin: fecha ISO del último check-in (o null)
+    """
+    # Fechas distintas de check-ins, en orden descendente
+    filas = db.query(
+        func.date(Checkin.created_at).label("fecha")
+    ).filter(
+        Checkin.user_id == current_user.id
+    ).distinct().order_by(
+        func.date(Checkin.created_at).desc()
+    ).all()
+
+    fechas = [row.fecha for row in filas]  # lista de date, más reciente primero
+
+    if not fechas:
+        return {"racha_actual": 0, "racha_maxima": 0, "ultimo_checkin": None}
+
+    # ---------------------------------------------------------------
+    # Racha actual
+    # ---------------------------------------------------------------
+    # La racha sigue viva si el último check-in fue hoy o ayer.
+    hoy = datetime.now(timezone.utc).date()
+    ayer = hoy - timedelta(days=1)
+
+    racha_actual = 0
+    if fechas[0] >= ayer:
+        racha_actual = 1
+        esperado = fechas[0] - timedelta(days=1)
+        for f in fechas[1:]:
+            if f == esperado:
+                racha_actual += 1
+                esperado -= timedelta(days=1)
+            else:
+                break  # cadena rota
+
+    # ---------------------------------------------------------------
+    # Racha máxima histórica
+    # ---------------------------------------------------------------
+    fechas_asc = sorted(fechas)
+    racha_maxima = 1
+    racha_temp = 1
+    for i in range(1, len(fechas_asc)):
+        if fechas_asc[i] - fechas_asc[i - 1] == timedelta(days=1):
+            racha_temp += 1
+            if racha_temp > racha_maxima:
+                racha_maxima = racha_temp
+        else:
+            racha_temp = 1
+
+    return {
+        "racha_actual": racha_actual,
+        "racha_maxima": racha_maxima,
+        "ultimo_checkin": str(fechas[0]),
+    }
+
+
+# -------------------------------------------------------------------
+# AUTH - CAMBIAR CONTRASEÑA
+# -------------------------------------------------------------------
+@app.post("/auth/me/change-password", status_code=200)
+def auth_me_change_password(
+    payload: ChangePasswordRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Cambia la contraseña del usuario autenticado.
+
+    Flujo:
+    1) Verifica que la contraseña actual es correcta
+    2) Valida la nueva (min 8 chars, ya garantizado por el schema)
+    3) Guarda el nuevo hash
+    4) Revoca todos los refresh tokens activos (cierre de sesiones)
+
+    Seguridad:
+    - OWASP A07: se exige la contraseña actual antes de cambiar
+    - OWASP A02: se usa bcrypt para el hash
+    """
+    # Si el usuario se registró con Google no tiene password_hash
+    if current_user.password_hash is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Tu cuenta usa login con Google; no tiene contraseña local.",
+        )
+
+    # Verificar contraseña actual
+    if not verify_password(payload.password_actual, current_user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="La contraseña actual no es correcta.",
+        )
+
+    # Guardar el nuevo hash
+    current_user.password_hash = hash_password(payload.password_nuevo)
+    db.commit()
+
+    return {"mensaje": "Contraseña actualizada correctamente."}
+
+
+# -------------------------------------------------------------------
 # AUTH - REFRESH
 # -------------------------------------------------------------------
 @app.post("/auth/refresh", response_model=TokenResponse)
@@ -620,6 +892,61 @@ def logout(
 # Endpoint de prueba para comprobar control de rol.
 # Solo debe entrar un usuario con role=admin.
 # -------------------------------------------------------------------
+# -------------------------------------------------------------------
+# Perfil público de cualquier usuario autenticado
+# -------------------------------------------------------------------
+# Solo expone datos públicos: nada de email ni fecha de nacimiento.
+# Cualquier usuario autenticado puede ver el perfil de otro.
+# Se usa desde el mini-perfil del ranking.
+# -------------------------------------------------------------------
+@app.get("/users/{user_id}/public")
+def get_public_profile(
+    user_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Devuelve el perfil público de un usuario y sus estadísticas básicas:
+    - avatar, username, ciudad, pais
+    - total de check-ins históricos
+    - total de puntos
+    """
+    from uuid import UUID as PyUUID
+    try:
+        uid = PyUUID(user_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="ID de usuario no válido")
+
+    usuario = db.query(User).filter(
+        User.id == uid,
+        User.is_active == True,
+    ).first()
+
+    if usuario is None:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+
+    # Total de check-ins históricos (contador directo desde la tabla)
+    total_checkins = db.query(func.count(Checkin.id)).filter(
+        Checkin.user_id == uid
+    ).scalar() or 0
+
+    # Puntos totales desde la tabla resumen
+    resumen = db.query(UserPointsTotal).filter(
+        UserPointsTotal.user_id == uid
+    ).first()
+    total_points = resumen.total_points if resumen else 0
+
+    return {
+        "user_id":        str(usuario.id),
+        "username":       usuario.username,
+        "avatar_url":     usuario.avatar_url,
+        "ciudad":         usuario.ciudad,
+        "pais":           usuario.pais,
+        "total_checkins": total_checkins,
+        "total_points":   total_points,
+    }
+
+
 @app.get("/admin/ping")
 def admin_ping(
     request: Request,

@@ -152,6 +152,54 @@ export const actualizarAvatar = async (token: string, avatarUrl: string) => {
 };
 
 /*
+ * Pide al backend las rachas de check-ins del usuario autenticado.
+ *
+ * Devuelve:
+ * - racha_actual: días consecutivos activos (0 si no hay racha viva)
+ * - racha_maxima: mejor racha histórica
+ * - ultimo_checkin: fecha ISO del último check-in o null
+ */
+export const obtenerMisRachas = async (token: string) => {
+    const respuesta = await hacerPeticion("/auth/me/streaks", {
+        metodo: "GET",
+        token,
+    });
+    return respuesta;
+};
+
+/*
+ * Cambia la contraseña del usuario autenticado.
+ * Envía la contraseña actual (para verificar identidad) y la nueva.
+ */
+export const cambiarContrasena = async (
+    token: string,
+    passwordActual: string,
+    passwordNuevo: string
+) => {
+    const respuesta = await hacerPeticion("/auth/me/change-password", {
+        metodo: "POST",
+        token,
+        body: {
+            password_actual: passwordActual,
+            password_nuevo: passwordNuevo,
+        },
+    });
+    return respuesta;
+};
+
+/*
+ * Intercambia un id_token de Google por nuestro propio JWT.
+ * El backend verifica el token con Google y devuelve access + refresh token.
+ */
+export const loginConGoogle = async (idToken: string) => {
+    const respuesta = await hacerPeticion("/auth/google", {
+        metodo: "POST",
+        body: { id_token: idToken },
+    });
+    return respuesta;
+};
+
+/*
  * Este método pide al backend los datos del usuario autenticado.
  *
  * Necesita:

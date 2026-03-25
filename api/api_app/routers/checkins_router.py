@@ -31,7 +31,8 @@ from ..audit import write_audit_log
 from ..auth import get_current_user
 from ..config import settings
 from ..database import get_db
-from ..models import Checkin, GroupMember, PointsLedger, User, UserPointsTotal
+from ..models import Checkin, GroupMember, PointsLedger, User, UserDevice, UserPointsTotal
+from ..notificaciones import enviar_notificacion_a_usuario, programar_notificacion_cooldown
 from ..schemas import CreateCheckinRequest, CheckinResponse, MapCheckinResponse
 
 
@@ -175,6 +176,18 @@ def crear_checkin(
             )
 
     # ---------------------------------------------------------------
+    # 4b) Si viene foto_url, se valida que sea de nuestro Cloudinary
+    #     para evitar que se guarden URLs arbitrarias de terceros
+    # ---------------------------------------------------------------
+    CLOUDINARY_PREFIX = "https://res.cloudinary.com/dxfvlrxaw/"
+    if payload.foto_url is not None:
+        if not payload.foto_url.startswith(CLOUDINARY_PREFIX):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="La URL de la foto no pertenece al servicio permitido",
+            )
+
+    # ---------------------------------------------------------------
     # 5) Se crea el check-in
     # ---------------------------------------------------------------
     checkin = Checkin(
@@ -185,6 +198,8 @@ def crear_checkin(
         lng=payload.lng,
         precio=payload.precio,
         note=payload.note,
+        foto_url=payload.foto_url,
+        icon_emoji=payload.icon_emoji,
     )
 
     db.add(checkin)
@@ -222,7 +237,39 @@ def crear_checkin(
     db.refresh(checkin)
 
     # ---------------------------------------------------------------
-    # 9) Se guarda auditoría
+    # 9) Notificaciones push (silenciosas si fallan)
+    # ---------------------------------------------------------------
+    # 9a) Notificar a los usuarios que el current_user acaba de superar.
+    #     Son los que tenían exactamente (nuevo_total - 1) puntos.
+    resumen_actual = db.query(UserPointsTotal).filter(
+        UserPointsTotal.user_id == current_user.id
+    ).first()
+
+    if resumen_actual is not None:
+        nuevo_total = resumen_actual.total_points
+        superados = db.query(UserPointsTotal).filter(
+            UserPointsTotal.total_points == nuevo_total - 1,
+            UserPointsTotal.user_id != current_user.id,
+        ).limit(10).all()
+
+        for superado in superados:
+            enviar_notificacion_a_usuario(
+                user_id=superado.user_id,
+                titulo="¡Te han superado! 📈",
+                mensaje=f"{current_user.username} te ha adelantado en el ranking.",
+                datos={"tipo": "superado"},
+                db=db,
+            )
+
+    # 9b) Programar aviso de cooldown (5 minutos)
+    tokens_usuario = [
+        d.push_token
+        for d in db.query(UserDevice).filter(UserDevice.user_id == current_user.id).all()
+    ]
+    programar_notificacion_cooldown(tokens_usuario, segundos=300)
+
+    # ---------------------------------------------------------------
+    # 10) Se guarda auditoría
     # ---------------------------------------------------------------
     write_audit_log(
         db=db,
@@ -240,6 +287,8 @@ def crear_checkin(
         lng=checkin.lng,
         precio=checkin.precio,
         note=checkin.note,
+        foto_url=checkin.foto_url,
+        icon_emoji=checkin.icon_emoji,
     )
 
 
@@ -276,6 +325,9 @@ def obtener_mi_mapa(
                 lat=checkin.lat,
                 lng=checkin.lng,
                 precio=checkin.precio,
+                note=checkin.note,
+                foto_url=checkin.foto_url,
+                icon_emoji=checkin.icon_emoji,
             )
         )
 

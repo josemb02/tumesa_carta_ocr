@@ -82,7 +82,10 @@ def _ranking_por_periodo(
     consulta = db.query(
         User.id.label("user_id"),
         User.username.label("username"),
-        func.coalesce(puntos_periodo, 0).label("points")
+        func.coalesce(puntos_periodo, 0).label("points"),
+        User.avatar_url.label("avatar_url"),
+        User.ciudad.label("ciudad"),
+        User.pais.label("pais"),
     ).join(
         PointsLedger,
         PointsLedger.user_id == User.id
@@ -116,6 +119,7 @@ def construir_respuesta_ranking(filas) -> list[RankingEntry]:
     Qué hace:
     - recorre las filas devueltas por la consulta
     - transforma cada fila en un objeto RankingEntry
+    - incluye avatar_url, ciudad y pais para el mini-perfil público
     - devuelve la lista final lista para la API
     """
     resultado = []
@@ -125,7 +129,10 @@ def construir_respuesta_ranking(filas) -> list[RankingEntry]:
             RankingEntry(
                 user_id=fila.user_id,
                 username=fila.username,
-                points=int(fila.points)
+                points=int(fila.points),
+                avatar_url=getattr(fila, "avatar_url", None),
+                ciudad=getattr(fila, "ciudad", None),
+                pais=getattr(fila, "pais", None),
             )
         )
 
@@ -209,7 +216,10 @@ def obtener_ranking_grupo(
     filas = db.query(
         User.id.label("user_id"),
         User.username.label("username"),
-        puntos_total.label("points")
+        puntos_total.label("points"),
+        User.avatar_url.label("avatar_url"),
+        User.ciudad.label("ciudad"),
+        User.pais.label("pais"),
     ).join(
         GroupMember,
         GroupMember.user_id == User.id
@@ -249,7 +259,10 @@ def obtener_ranking_global(
     filas = db.query(
         User.id.label("user_id"),
         User.username.label("username"),
-        puntos_total.label("points")
+        puntos_total.label("points"),
+        User.avatar_url.label("avatar_url"),
+        User.ciudad.label("ciudad"),
+        User.pais.label("pais"),
     ).outerjoin(
         UserPointsTotal,
         UserPointsTotal.user_id == User.id
@@ -367,7 +380,10 @@ def obtener_ranking_pais(
     filas = db.query(
         User.id.label("user_id"),
         User.username.label("username"),
-        puntos_total.label("points")
+        puntos_total.label("points"),
+        User.avatar_url.label("avatar_url"),
+        User.ciudad.label("ciudad"),
+        User.pais.label("pais"),
     ).outerjoin(
         UserPointsTotal,
         UserPointsTotal.user_id == User.id
@@ -407,7 +423,10 @@ def obtener_ranking_ciudad(
     filas = db.query(
         User.id.label("user_id"),
         User.username.label("username"),
-        puntos_total.label("points")
+        puntos_total.label("points"),
+        User.avatar_url.label("avatar_url"),
+        User.ciudad.label("ciudad"),
+        User.pais.label("pais"),
     ).outerjoin(
         UserPointsTotal,
         UserPointsTotal.user_id == User.id

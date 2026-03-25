@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
     ActivityIndicator,
     Alert,
+    Image,
     KeyboardAvoidingView,
     Modal,
     Platform,
@@ -13,12 +14,14 @@ import {
     TextInput,
     View,
 } from "react-native";
+import * as Haptics from "expo-haptics";
 import MapView, { Marker, PROVIDER_DEFAULT } from "react-native-maps";
 import * as Location from "expo-location";
 import { useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { usarAuth } from "../../contexto/ContextoAuth";
 import { hacerPeticion } from "../../servicios/api";
+import { obtenerMisRachas } from "../../servicios/servicioAuth";
 import { obtenerMisIconos } from "../../servicios/servicioIconos";
 import { AvatarCirculo } from "../../componentes/AvatarCirculo";
 
@@ -27,12 +30,9 @@ type CheckinMapa = {
     lat: number;
     lng: number;
     precio: number | null;
-};
-
-type Grupo = {
-    id: string;
-    name: string;
-    join_code: string;
+    note: string | null;
+    foto_url: string | null;
+    icon_emoji: string | null;
 };
 
 /*
@@ -46,6 +46,23 @@ type IconoDisponible = {
     activo: boolean;
 };
 
+
+// ─── Mensajes de error amigables ─────────────────────────────────────────────
+
+/*
+ * Convierte errores técnicos de la API en mensajes comprensibles para el usuario.
+ * Compara el texto del error con patrones conocidos y devuelve el texto amigable.
+ */
+function mensajeAmigable(e: any): string {
+    const raw = (e?.message ?? "").toLowerCase();
+    if (raw.includes("network request failed") || raw.includes("failed to fetch") || raw.includes("network error")) {
+        return "Sin conexión. Comprueba tu internet";
+    }
+    if (raw.includes("esperar") || raw.includes("cooldown") || raw.includes("check-in")) {
+        return "Espera 5 minutos entre cervezas 🍺";
+    }
+    return e?.message || "Algo ha ido mal. Inténtalo de nuevo";
+}
 
 // ─── Estilo mapa mudo ─────────────────────────────────────────────────────────
 
@@ -75,13 +92,28 @@ export default function Mapa() {
         latitude: number;
         longitude: number;
     } | null>(null);
+    // Racha actual del usuario (0 si no hay racha viva)
+    const [rachaActual, setRachaActual] = useState(0);
+    // Check-in seleccionado al pulsar un marker → abre el modal de detalle
+    const [checkinSeleccionado, setCheckinSeleccionado] = useState<CheckinMapa | null>(null);
 
     useFocusEffect(
         useCallback(() => {
             cargarMapa();
             obtenerUbicacion();
+            cargarRacha();
         }, [token])
     );
+
+    async function cargarRacha() {
+        if (!token) return;
+        try {
+            const datos = await obtenerMisRachas(token);
+            setRachaActual(datos.racha_actual ?? 0);
+        } catch {
+            // Fallo silencioso: el badge simplemente no se muestra
+        }
+    }
 
     async function obtenerUbicacion() {
         try {
@@ -130,7 +162,11 @@ export default function Mapa() {
                     />
                     <View>
                         <Text style={s.headerNombre}>{usuario?.username}</Text>
-                        <Text style={s.headerSub}>Tu mapa de cervezas</Text>
+                        {rachaActual >= 3 ? (
+                            <Text style={s.headerSub}>🔥 {rachaActual} días de racha</Text>
+                        ) : (
+                            <Text style={s.headerSub}>Tu mapa de cervezas</Text>
+                        )}
                     </View>
                 </View>
                 <View style={s.headerPts}>
@@ -166,6 +202,13 @@ export default function Mapa() {
                 </View>
             ) : (
                 <View style={s.mapaContenedor}>
+                    {/* Banner flotante cuando el usuario aún no tiene ningún check-in */}
+                    {checkins.length === 0 && (
+                        <View pointerEvents="none" style={s.mapaSinDatos}>
+                            <Text style={s.mapaSinDatosTitulo}>¡Registra tu primera cerveza!</Text>
+                            <Text style={s.mapaSinDatosTexto}>Pulsa + para empezar</Text>
+                        </View>
+                    )}
                     <MapView
                         style={s.mapa}
                         provider={PROVIDER_DEFAULT}
@@ -177,18 +220,27 @@ export default function Mapa() {
                         showsTraffic={false}
                         customMapStyle={MAPA_ESTILO}
                     >
-                        {checkins.map((c, i) => (
+                        {checkins.map((c) => (
+                            // Sin title/description para que el onPress no compita
+                            // con el callout nativo de iOS
                             <Marker
                                 key={c.id}
                                 coordinate={{
                                     latitude: Number(c.lat),
                                     longitude: Number(c.lng),
                                 }}
-                                title={`Cerveza #${i + 1}`}
-                                description={c.precio ? `${Number(c.precio).toFixed(2)}€` : undefined}
+                                onPress={() => setCheckinSeleccionado(c)}
+                                tracksViewChanges={false}
                             >
                                 <View style={s.marker}>
-                                    <Text style={s.markerEmoji}>🍺</Text>
+                                    {/* Usamos el emoji guardado; 🍺 como fallback */}
+                                    <Text style={s.markerEmoji}>
+                                        {c.icon_emoji ?? "🍺"}
+                                    </Text>
+                                    {/* Indicador visual de foto */}
+                                    {c.foto_url && (
+                                        <View style={s.markerFotoBadge} />
+                                    )}
                                 </View>
                             </Marker>
                         ))}
@@ -210,6 +262,12 @@ export default function Mapa() {
                 onCerrar={() => setModalCheckin(false)}
                 onExito={() => { setModalCheckin(false); cargarMapa(); }}
             />
+
+            {/* Modal de detalle: se abre al pulsar un marker */}
+            <ModalDetalle
+                checkin={checkinSeleccionado}
+                onCerrar={() => setCheckinSeleccionado(null)}
+            />
         </SafeAreaView>
     );
 }
@@ -224,8 +282,6 @@ function ModalCheckin({ visible, token, onCerrar, onExito }: {
 }) {
     const [precio, setPrecio] = useState("");
     const [nota, setNota] = useState("");
-    const [grupos, setGrupos] = useState<Grupo[]>([]);
-    const [grupoSeleccionado, setGrupoSeleccionado] = useState<string | null>(null);
     const [misIconos, setMisIconos] = useState<IconoDisponible[]>([]);
     const [iconoSeleccionado, setIconoSeleccionado] = useState<string | null>(null);
     const [enviando, setEnviando] = useState(false);
@@ -233,17 +289,9 @@ function ModalCheckin({ visible, token, onCerrar, onExito }: {
 
     useEffect(() => {
         if (visible && token) {
-            cargarGrupos();
             cargarIconos();
         }
     }, [visible]);
-
-    async function cargarGrupos() {
-        try {
-            const datos = await hacerPeticion("/groups/my", { metodo: "GET", token });
-            setGrupos(datos);
-        } catch { setGrupos([]); }
-    }
 
     /*
      * Carga los iconos que posee el usuario desde el backend.
@@ -266,7 +314,8 @@ function ModalCheckin({ visible, token, onCerrar, onExito }: {
             setFaseEnvio("Obteniendo ubicación...");
             const { status } = await Location.requestForegroundPermissionsAsync();
             if (status !== "granted") {
-                Alert.alert("Permiso denegado", "Necesitamos acceso a tu ubicación.");
+                // Mensaje motivador en vez del técnico "Permiso denegado"
+                Alert.alert("GPS desactivado", "Activa el GPS para registrar tu cerveza");
                 setEnviando(false);
                 return;
             }
@@ -288,17 +337,25 @@ function ModalCheckin({ visible, token, onCerrar, onExito }: {
                 body.precio = n;
             }
             if (nota.trim()) body.note = nota.trim();
-            if (grupoSeleccionado) body.group_id = grupoSeleccionado;
+
+            // Siempre enviamos el emoji del icono seleccionado.
+            // Si la carga de iconos falló y no hay selección, usamos 🍺 como fallback
+            // para que el marcador en el mapa siempre muestre algo coherente.
+            const ic = iconoSeleccionado ? misIconos.find(x => x.id === iconoSeleccionado) : null;
+            body.icon_emoji = ic?.emoji ?? "🍺";
 
             await hacerPeticion("/checkins", { metodo: "POST", token, body });
 
-            setPrecio(""); setNota(""); setGrupoSeleccionado(null);
+            // Vibración corta de éxito al registrar la cerveza
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+            setPrecio(""); setNota("");
             // Restauramos al icono activo (o al primero de la lista)
             const activo = misIconos.find(ic => ic.activo);
             setIconoSeleccionado(activo ? activo.id : (misIconos[0]?.id ?? null));
             onExito();
         } catch (e: any) {
-            Alert.alert("Error", e?.message || "No se pudo registrar");
+            Alert.alert("Error", mensajeAmigable(e));
         } finally {
             setEnviando(false);
             setFaseEnvio("");
@@ -374,26 +431,6 @@ function ModalCheckin({ visible, token, onCerrar, onExito }: {
                                 style={[s.input, s.inputMulti]}
                             />
 
-                            {/* Grupos */}
-                            {grupos.length > 0 && (
-                                <>
-                                    <Text style={s.fieldLabel}>Asociar a grupo</Text>
-                                    {grupos.map(g => (
-                                        <Pressable
-                                            key={g.id}
-                                            style={[s.grupoRow, grupoSeleccionado === g.id && s.grupoRowActivo]}
-                                            onPress={() => setGrupoSeleccionado(grupoSeleccionado === g.id ? null : g.id)}
-                                        >
-                                            <Text style={[s.grupoNombre, grupoSeleccionado === g.id && s.grupoNombreActivo]}>
-                                                {g.name}
-                                            </Text>
-                                            {grupoSeleccionado === g.id &&
-                                                <Ionicons name="checkmark" size={16} color="#FFFFFF" />}
-                                        </Pressable>
-                                    ))}
-                                </>
-                            )}
-
                             <Pressable
                                 style={({ pressed }) => [s.btnPrimary, enviando && s.btnDisabled, pressed && s.btnPressed]}
                                 onPress={enviar}
@@ -411,6 +448,81 @@ function ModalCheckin({ visible, token, onCerrar, onExito }: {
                     </Pressable>
                 </Pressable>
             </KeyboardAvoidingView>
+        </Modal>
+    );
+}
+
+// ─── Modal detalle de check-in ────────────────────────────────────────────────
+
+/*
+ * Se muestra al pulsar un marker en el mapa.
+ * Enseña la foto (si la tiene), el precio y la nota del check-in.
+ */
+function ModalDetalle({
+    checkin,
+    onCerrar,
+}: {
+    checkin: CheckinMapa | null;
+    onCerrar: () => void;
+}) {
+    if (!checkin) return null;
+
+    const tieneFoto   = !!checkin.foto_url;
+    const tienePrecio = checkin.precio !== null;
+    const tieneNota   = !!checkin.note;
+
+    return (
+        <Modal
+            visible={!!checkin}
+            animationType="slide"
+            transparent
+            onRequestClose={onCerrar}
+            statusBarTranslucent
+        >
+            <Pressable style={s.overlay} onPress={onCerrar}>
+                {/* stopPropagation: evita que el tap dentro del sheet lo cierre */}
+                <Pressable style={s.sheet} onPress={() => {}}>
+                    <View style={s.handle} />
+
+                    <View style={s.sheetHeader}>
+                        <Text style={s.sheetTitulo}>🍺 Detalle</Text>
+                        <Pressable onPress={onCerrar} style={s.closeBtn}>
+                            <Ionicons name="close" size={20} color="#4E5968" />
+                        </Pressable>
+                    </View>
+
+                    {/* Foto del check-in */}
+                    {tieneFoto && (
+                        <Image
+                            source={{ uri: checkin.foto_url! }}
+                            style={s.detalleFoto}
+                            resizeMode="cover"
+                        />
+                    )}
+
+                    {/* Precio y nota */}
+                    {(tienePrecio || tieneNota) && (
+                        <View style={s.detalleInfo}>
+                            {tienePrecio && (
+                                <View style={s.detalleFilaPrecio}>
+                                    <Ionicons name="cash-outline" size={16} color="#6B85A8" />
+                                    <Text style={s.detallePrecio}>
+                                        {Number(checkin.precio).toFixed(2)} €
+                                    </Text>
+                                </View>
+                            )}
+                            {tieneNota && (
+                                <Text style={s.detalleNota}>{checkin.note}</Text>
+                            )}
+                        </View>
+                    )}
+
+                    {/* Mensaje cuando no hay info extra */}
+                    {!tieneFoto && !tienePrecio && !tieneNota && (
+                        <Text style={s.detalleSinInfo}>Sin información adicional</Text>
+                    )}
+                </Pressable>
+            </Pressable>
         </Modal>
     );
 }
@@ -458,6 +570,27 @@ const s = StyleSheet.create({
     mapa: { flex: 1 },
     mapaPlaceholder: { flex: 1, justifyContent: "center", alignItems: "center" },
 
+    // Banner flotante sobre el mapa cuando no hay check-ins
+    mapaSinDatos: {
+        position: "absolute",
+        bottom: 20,
+        left: 16,
+        right: 16,
+        zIndex: 10,
+        alignItems: "center",
+        backgroundColor: "rgba(255,255,255,0.95)",
+        borderRadius: 16,
+        paddingVertical: 14,
+        paddingHorizontal: 20,
+        shadowColor: "#10233E",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+        elevation: 4,
+    },
+    mapaSinDatosTitulo: { fontSize: 15, fontWeight: "700", color: "#10233E", marginBottom: 4 },
+    mapaSinDatosTexto: { fontSize: 13, color: "#6B85A8" },
+
     marker: {
         width: 42,
         height: 42,
@@ -474,6 +607,13 @@ const s = StyleSheet.create({
         borderColor: "#E2E8F0",
     },
     markerEmoji: { fontSize: 22 },
+    // Punto naranja en la esquina del marker si tiene foto
+    markerFotoBadge: {
+        position: "absolute", top: 2, right: 2,
+        width: 8, height: 8, borderRadius: 4,
+        backgroundColor: "#F6AD55",
+        borderWidth: 1, borderColor: "#FFFFFF",
+    },
 
     fab: {
         position: "absolute",
@@ -570,4 +710,38 @@ const s = StyleSheet.create({
     btnDisabled: { opacity: 0.6 },
     btnPressed: { opacity: 0.85 },
     btnLabel: { color: "#FFFFFF", fontSize: 15, fontWeight: "700", letterSpacing: 0.2 },
+
+    // ── Modal detalle de check-in ──────────────────────────────────────────────
+    detalleFoto: {
+        width: "100%",
+        height: 200,
+        borderRadius: 12,
+        backgroundColor: "#E2E8F0",
+        marginBottom: 16,
+    },
+    detalleInfo: {
+        gap: 10,
+        marginBottom: 8,
+    },
+    detalleFilaPrecio: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 6,
+    },
+    detallePrecio: {
+        fontSize: 16,
+        fontWeight: "700",
+        color: "#10233E",
+    },
+    detalleNota: {
+        fontSize: 15,
+        color: "#4E5968",
+        lineHeight: 22,
+    },
+    detalleSinInfo: {
+        fontSize: 14,
+        color: "#9AAABB",
+        textAlign: "center",
+        paddingVertical: 12,
+    },
 });

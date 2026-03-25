@@ -9,6 +9,7 @@ import {
 } from "../utils/almacenamiento";
 import {
     loginUsuario,
+    loginConGoogle,
     obtenerMiPerfil,
     registrarUsuario,
     refrescarToken,
@@ -16,6 +17,7 @@ import {
     actualizarAvatar,
 } from "../servicios/servicioAuth";
 import { configurarCallbacksAuth } from "../servicios/api";
+import { registrarTokenPush } from "../servicios/servicioNotificaciones";
 
 /*
  * Este archivo se encarga de gestionar la autenticación
@@ -68,6 +70,7 @@ type TipoContextoAuth = {
     ) => Promise<void>;
     cerrarSesion: () => Promise<void>;
     recargarUsuario: () => Promise<void>;
+    iniciarSesionConGoogle: (idToken: string) => Promise<void>;
     /*
      * Guarda la URL del avatar en el backend y actualiza el estado local.
      * Se llama desde perfil.tsx tras subir la imagen a Cloudinary.
@@ -197,6 +200,9 @@ function ProveedorAuth({ children }: { children: React.ReactNode }) {
 
         setToken(nuevoToken);
         setUsuario(perfil);
+
+        // Registrar token push en segundo plano (fallo silencioso)
+        registrarTokenPush(nuevoToken);
     }
 
     /*
@@ -274,6 +280,22 @@ function ProveedorAuth({ children }: { children: React.ReactNode }) {
      *
      * La subida a Cloudinary la hace el frontend antes de llamar aquí.
      */
+    async function iniciarSesionConGoogle(idToken: string) {
+        const respuesta = await loginConGoogle(idToken);
+        const nuevoToken = respuesta.access_token;
+        const nuevoRefreshToken = respuesta.refresh_token;
+
+        await guardarToken(nuevoToken);
+        await guardarRefreshToken(nuevoRefreshToken);
+
+        const perfil = await obtenerMiPerfil(nuevoToken);
+
+        setToken(nuevoToken);
+        setUsuario(perfil);
+
+        registrarTokenPush(nuevoToken);
+    }
+
     async function guardarAvatar(avatarUrl: string) {
         if (!token) return;
 
@@ -293,6 +315,7 @@ function ProveedorAuth({ children }: { children: React.ReactNode }) {
                 registrarNuevoUsuario,
                 cerrarSesion,
                 recargarUsuario,
+                iniciarSesionConGoogle,
                 guardarAvatar,
             }}
         >
