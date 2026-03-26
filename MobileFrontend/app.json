@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "BeerMap",
-    "slug": "beermap",
+    "slug": "MobileFrontend",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/imagenes/BeerMap_APP_logo.png",
@@ -35,7 +35,8 @@
           }
         }
       ],
-      "expo-web-browser"
+      "expo-web-browser",
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true,
@@ -46,6 +47,7 @@
       "eas": {
         "projectId": "53f42ea9-884f-470f-8f6b-e0a236a94777"
       }
-    }
+    },
+    "owner": "josemb02"
   }
 }
