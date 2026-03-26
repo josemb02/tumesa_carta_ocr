@@ -424,6 +424,18 @@ def auth_google(
             detail="Token de Google inválido o caducado",
         )
 
+    # Verificamos que el token fue emitido para esta aplicación concreta.
+    # Si GOOGLE_CLIENT_ID está configurado, el campo "aud" del token
+    # debe coincidir con él. Si está vacío, omitimos la comprobación
+    # para no romper entornos de desarrollo sin CLIENT_ID definido.
+    if settings.GOOGLE_CLIENT_ID:
+        aud = info.get("aud", "")
+        if aud != settings.GOOGLE_CLIENT_ID:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Token de Google no dirigido a esta aplicación",
+            )
+
     google_id = info.get("sub")
     email = info.get("email")
     email_verified = info.get("email_verified", "false")

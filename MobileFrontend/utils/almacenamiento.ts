@@ -1,21 +1,29 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
+// SEGURIDAD: Se usa expo-secure-store en lugar de AsyncStorage.
+// AsyncStorage no está cifrado en Android (cualquier app con root puede leerlo).
+// SecureStore usa Keychain en iOS y EncryptedSharedPreferences en Android.
+//
+// Límite: 2048 bytes por clave — los JWT de BeerMap caben perfectamente.
+//
+// Para instalar (si no está ya): npx expo install expo-secure-store
+
+import * as SecureStore from "expo-secure-store";
 import { CLAVE_TOKEN, CLAVE_REFRESH_TOKEN } from "./constantes";
 
 /*
- * Este archivo se encarga del almacenamiento local
+ * Este archivo se encarga del almacenamiento local seguro
  * relacionado con la sesión del usuario.
  *
  * Aquí centralizamos el guardado del token para:
  * - no repetir lógica
- * - no tocar AsyncStorage desde muchas pantallas
+ * - no tocar SecureStore desde muchas pantallas
  * - mantener el proyecto más limpio
  */
 
 /*
- * Guarda el token de sesión en almacenamiento local.
+ * Guarda el token de sesión en almacenamiento cifrado.
  */
 export const guardarToken = async (token: string) => {
-    await AsyncStorage.setItem(CLAVE_TOKEN, token);
+    await SecureStore.setItemAsync(CLAVE_TOKEN, token);
 };
 
 /*
@@ -23,7 +31,7 @@ export const guardarToken = async (token: string) => {
  * Si no existe, devuelve null.
  */
 export const obtenerToken = async () => {
-    const token = await AsyncStorage.getItem(CLAVE_TOKEN);
+    const token = await SecureStore.getItemAsync(CLAVE_TOKEN);
     return token;
 };
 
@@ -32,7 +40,7 @@ export const obtenerToken = async () => {
  * Se usará al cerrar sesión.
  */
 export const borrarToken = async () => {
-    await AsyncStorage.removeItem(CLAVE_TOKEN);
+    await SecureStore.deleteItemAsync(CLAVE_TOKEN);
 };
 
 // =========================================================
@@ -40,10 +48,10 @@ export const borrarToken = async () => {
 // =========================================================
 
 /*
- * Guarda el refresh token en almacenamiento local.
+ * Guarda el refresh token en almacenamiento cifrado.
  */
 export const guardarRefreshToken = async (token: string) => {
-    await AsyncStorage.setItem(CLAVE_REFRESH_TOKEN, token);
+    await SecureStore.setItemAsync(CLAVE_REFRESH_TOKEN, token);
 };
 
 /*
@@ -51,7 +59,7 @@ export const guardarRefreshToken = async (token: string) => {
  * Si no existe, devuelve null.
  */
 export const obtenerRefreshToken = async () => {
-    const token = await AsyncStorage.getItem(CLAVE_REFRESH_TOKEN);
+    const token = await SecureStore.getItemAsync(CLAVE_REFRESH_TOKEN);
     return token;
 };
 
@@ -60,5 +68,5 @@ export const obtenerRefreshToken = async () => {
  * Se usará al cerrar sesión o cuando el refresh falle.
  */
 export const borrarRefreshToken = async () => {
-    await AsyncStorage.removeItem(CLAVE_REFRESH_TOKEN);
+    await SecureStore.deleteItemAsync(CLAVE_REFRESH_TOKEN);
 };

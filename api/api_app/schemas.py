@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
 from typing import Optional
 from uuid import UUID
 from decimal import Decimal
@@ -125,6 +125,15 @@ class GroupResponse(BaseModel):
 # CHECKINS
 # =========================================================
 
+# Emojis de icono permitidos en BeerMap.
+# Si el cliente envía un valor fuera de esta lista, se usa 🍺 como fallback
+# (no se rechaza la petición, para no romper versiones antiguas de la app).
+_EMOJIS_VALIDOS = frozenset([
+    "🍺", "🍻", "🥤", "🤠", "🥴", "😎", "🤑", "🫡",
+    "🦆", "🐸", "🌮", "🦩", "🪩", "🐉", "👺", "🫧", "🪄",
+])
+
+
 class CreateCheckinRequest(BaseModel):
     """
     Crear un check-in de cerveza.
@@ -144,6 +153,20 @@ class CreateCheckinRequest(BaseModel):
 
     # Emoji del icono seleccionado (máx. 10 chars para admitir emojis compuestos)
     icon_emoji: Optional[str] = Field(default=None, max_length=10)
+
+    @field_validator("icon_emoji")
+    @classmethod
+    def validar_icon_emoji(cls, v: Optional[str]) -> Optional[str]:
+        """
+        Acepta solo emojis de la lista permitida de BeerMap.
+        Si viene un valor distinto, usa 🍺 como fallback en lugar de rechazar.
+        Esto garantiza que versiones antiguas de la app no fallen.
+        """
+        if v is None:
+            return v
+        if v not in _EMOJIS_VALIDOS:
+            return "🍺"
+        return v
 
 
 class CheckinResponse(BaseModel):

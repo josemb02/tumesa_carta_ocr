@@ -1,5 +1,8 @@
 # api/app/config.py
+import logging
 import os
+
+logger = logging.getLogger(__name__)
 
 # =========================================================
 # BeerMap - CONFIG CENTRAL DE LA APLICACIÓN
@@ -63,6 +66,37 @@ class Settings:
         # CORS
         self.CORS_ORIGINS = _get_env("CORS_ORIGINS", "*")
 
+        # En producción CORS debería ser una lista concreta de dominios, no "*".
+        # Si sigue abierto en prod, logueamos un aviso claro.
+        if self.ENV == "prod" and self.CORS_ORIGINS.strip() == "*":
+            logger.warning(
+                "[SEGURIDAD] CORS_ORIGINS='*' en entorno PROD — "
+                "define una lista de dominios permitidos antes de publicar en stores"
+            )
+
+        # -------------------------------------------------
+        # Google OAuth
+        # -------------------------------------------------
+        # Si se configura, se verifica que el campo "aud" del id_token
+        # de Google coincide con este CLIENT_ID para evitar token hijacking.
+        # Si está vacío, se omite la verificación (compatibilidad con dev).
+        self.GOOGLE_CLIENT_ID = _get_env("GOOGLE_CLIENT_ID", "")
+
+        # -------------------------------------------------
+        # Cloudinary
+        # -------------------------------------------------
+        # Se aceptan los nombres en inglés y los originales en español
+        # por si las variables de Railway se configuraron en español.
+        self.CLOUDINARY_CLOUD_NAME = (
+            _get_env("CLOUDINARY_CLOUD_NAME")
+            or _get_env("NOMBRE_DE_LA_NUBE_CLOUDINARY")
+        )
+        self.CLOUDINARY_API_KEY = (
+            _get_env("CLOUDINARY_API_KEY")
+            or _get_env("CLAVE_API_DE_CLOUDINARY")
+        )
+        self.CLOUDINARY_API_SECRET = _get_env("CLOUDINARY_API_SECRET")
+
         # -------------------------------------------------
         # Anti-fuerza bruta / rate limit
         # -------------------------------------------------
@@ -99,3 +133,9 @@ LOGIN_MAX_ATTEMPTS = settings.LOGIN_MAX_ATTEMPTS
 LOGIN_WINDOW_SECONDS = settings.LOGIN_WINDOW_SECONDS
 LOGIN_BLOCK_SECONDS = settings.LOGIN_BLOCK_SECONDS
 REDIS_SOCKET_TIMEOUT = settings.REDIS_SOCKET_TIMEOUT
+
+GOOGLE_CLIENT_ID = settings.GOOGLE_CLIENT_ID
+
+CLOUDINARY_CLOUD_NAME = settings.CLOUDINARY_CLOUD_NAME
+CLOUDINARY_API_KEY = settings.CLOUDINARY_API_KEY
+CLOUDINARY_API_SECRET = settings.CLOUDINARY_API_SECRET

@@ -28,6 +28,8 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
 
+from .config import settings
+
 logger = logging.getLogger("beermap")
 
 
@@ -135,7 +137,15 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         # Restringe acceso a capacidades del navegador
         response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
 
-        # HSTS solo si tienes HTTPS real delante en producción
-        # response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        # HSTS: solo se activa en producción, donde hay HTTPS real delante.
+        # En desarrollo lo omitimos para no forzar HTTPS en localhost.
+        if settings.ENV == "prod":
+            response.headers["Strict-Transport-Security"] = (
+                "max-age=31536000; includeSubDomains"
+            )
+
+        # CSP básico: la API solo devuelve JSON, no sirve HTML ni scripts.
+        # default-src 'none' es el valor más restrictivo posible.
+        response.headers["Content-Security-Policy"] = "default-src 'none'"
 
         return response
