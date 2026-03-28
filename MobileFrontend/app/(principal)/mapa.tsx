@@ -603,13 +603,14 @@ const s = StyleSheet.create({
     },
 
     // Botón flotante sobre el mapa — posición absoluta en la esquina inferior
+    // Ligera transparencia para que no tape tanto el mapa debajo
     btnRegistrar: {
         position: "absolute",
         bottom: 16,
         left: 16,
         right: 16,
         height: 52,
-        backgroundColor: "#10233E",
+        backgroundColor: "rgba(16, 35, 62, 0.78)",
         borderRadius: 14,
         justifyContent: "center",
         alignItems: "center",

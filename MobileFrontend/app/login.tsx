@@ -127,8 +127,7 @@ export default function Login() {
                         <Text style={styles.titulo}>Inicia sesión</Text>
 
                         <Text style={styles.subtitulo}>
-                            Accede a tu mapa de cervezas, registra tus check-ins
-                            y sigue sumando puntos con tus amigos.
+                            Tu mapa de cervezas te espera 🍺
                         </Text>
                     </View>
 
@@ -223,7 +222,15 @@ export default function Login() {
                                 <ActivityIndicator color="#10233E" />
                             ) : (
                                 <>
-                                    <Text style={styles.logoGoogle}>G</Text>
+                                    {/* "G" con los colores reales de Google */}
+                                    <Text style={styles.logoGoogle}>
+                                        <Text style={{ color: "#4285F4" }}>G</Text>
+                                        <Text style={{ color: "#EA4335" }}>o</Text>
+                                        <Text style={{ color: "#FBBC05" }}>o</Text>
+                                        <Text style={{ color: "#4285F4" }}>g</Text>
+                                        <Text style={{ color: "#34A853" }}>l</Text>
+                                        <Text style={{ color: "#EA4335" }}>e</Text>
+                                    </Text>
                                     <Text style={styles.textoBotonGoogle}>Continuar con Google</Text>
                                 </>
                             )}
@@ -259,10 +266,10 @@ const styles = StyleSheet.create({
     },
     bloqueSuperior: { alignItems: "center", marginBottom: 28 },
     logo: { width: 220, height: 130, marginBottom: 12 },
-    titulo: { fontSize: 28, fontWeight: "700", color: "#10233E", marginBottom: 8 },
+    titulo: { fontSize: 28, fontWeight: "700", color: "#10233E", marginBottom: 8, letterSpacing: -0.5 },
     subtitulo: {
-        fontSize: 14, color: "#4E5968", textAlign: "center",
-        lineHeight: 21, paddingHorizontal: 8
+        fontSize: 14, color: "#6B85A8", textAlign: "center",
+        lineHeight: 20, paddingHorizontal: 8
     },
     tarjeta: {
         backgroundColor: "#FFFFFF",
@@ -277,9 +284,9 @@ const styles = StyleSheet.create({
     bloqueCampo: { marginBottom: 16 },
     label: { fontSize: 14, fontWeight: "600", color: "#10233E", marginBottom: 8 },
     input: {
-        height: 52, borderWidth: 1, borderColor: "#D8DEE8",
+        height: 52, borderWidth: 1, borderColor: "#E2E8F0",
         borderRadius: 12, paddingHorizontal: 14,
-        fontSize: 15, color: "#10233E", backgroundColor: "#FFFFFF"
+        fontSize: 15, color: "#10233E", backgroundColor: "#F8F9FB"
     },
     // Contenedor relativo para superponer el icono de ojo
     inputConBoton: { flexDirection: "row", alignItems: "center" },
@@ -313,7 +320,7 @@ const styles = StyleSheet.create({
         gap: 10
     },
     botonGooglePulsado: { backgroundColor: "#F5F5F5" },
-    logoGoogle: { fontSize: 18, fontWeight: "700", color: "#4285F4" },
+    logoGoogle: { fontSize: 17, fontWeight: "700" },
     textoBotonGoogle: { fontSize: 15, fontWeight: "600", color: "#10233E" },
 
     bloqueRegistro: {
