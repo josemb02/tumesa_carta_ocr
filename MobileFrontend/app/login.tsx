@@ -119,7 +119,7 @@ export default function Login() {
                 >
                     <View style={styles.bloqueSuperior}>
                         <Image
-                            source={require("../assets/imagenes/BeerMap_marca_Logo.png")}
+                            source={require("../assets/imagenes/BeerNow_marca_Logo.png")}
                             style={styles.logo}
                             resizeMode="contain"
                         />
