@@ -867,24 +867,23 @@ def forgot_password(
         resend.api_key = settings.RESEND_API_KEY
         reset_link = f"https://beer-now.com/reset-password?token={raw_token}"
         try:
+            html_content = (
+                "<div style='font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px'>"
+                "<h2 style='color:#10233E'>Recupera tu contraseña</h2>"
+                "<p>Hemos recibido una solicitud para restablecer la contraseña de tu cuenta BeerNow.</p>"
+                "<p>Pulsa el botón para crear una contraseña nueva. El enlace caduca en <strong>1 hora</strong>.</p>"
+                f"<a href='{reset_link}' style='display:inline-block;background:#10233E;color:#fff;"
+                "padding:14px 28px;border-radius:8px;text-decoration:none;font-weight:700;margin:16px 0'>"
+                "Restablecer contraseña</a>"
+                "<p style='color:#888;font-size:13px'>Si no solicitaste esto ignora este email.</p>"
+                "<p style='color:#888;font-size:13px'>El equipo de BeerNow</p>"
+                "</div>"
+            )
             resend.Emails.send({
                 "from": "BeerNow <noreply@beer-now.com>",
                 "to": user.email,
                 "subject": "Recupera tu contraseña de BeerNow",
-                "html": f"""
-                <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px">
-                  <h2 style="color:#10233E">Recupera tu contraseña</h2>
-                  <p>Hemos recibido una solicitud para restablecer la contraseña de tu cuenta BeerNow.</p>
-                  <p>Pulsa el botón para crear una contraseña nueva. El enlace caduca en <strong>1 hora</strong>.</p>
-                  <a href="{reset_link}"
-                     style="display:inline-block;background:#10233E;color:#fff;padding:14px 28px;
-                            border-radius:8px;text-decoration:none;font-weight:700;margin:16px 0">
-                    Restablecer contraseña
-                  </a>
-                  <p style="color:#888;font-size:13px">Si no solicitaste esto ignora este email.</p>
-                  <p style="color:#888;font-size:13px">El equipo de BeerNow</p>
-                </div>
-                """,
+                "html": html_content,
             })
         except Exception as e:
             import logging
