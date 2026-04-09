@@ -835,7 +835,7 @@ def forgot_password(
     Envía un email con link válido 1 hora si el email existe.
     """
     ip = getattr(request.state, "client_ip", "unknown")
-    rate_limit(key=f"forgot_password:{ip}", max_requests=3, window_seconds=3600)
+    rate_limit(key=f"forgot_password:{ip}", max_requests=10, window_seconds=60)
 
     # Buscamos el usuario — si no existe devolvemos 200 igualmente
     user = db.query(User).filter(User.email == payload.email.lower().strip()).first()
