@@ -5,6 +5,7 @@ import {
     FlatList,
     Image,
     KeyboardAvoidingView,
+    Linking,
     Modal,
     Platform,
     Pressable,
@@ -329,6 +330,20 @@ export default function Registro() {
                                     </Pressable>
                                 </Campo>
 
+                                {/* Aviso legal obligatorio para stores */}
+                                <View style={styles.avisoLegal}>
+                                    <Text style={styles.avisoTexto}>
+                                        Al registrarte aceptas los{" "}
+                                    </Text>
+                                    <Pressable onPress={() => Linking.openURL("https://beer-now.com/terminos.html")}>
+                                        <Text style={[styles.avisoTexto, styles.avisoEnlace]}>Términos de uso</Text>
+                                    </Pressable>
+                                    <Text style={styles.avisoTexto}> y la </Text>
+                                    <Pressable onPress={() => Linking.openURL("https://beer-now.com/privacidad.html")}>
+                                        <Text style={[styles.avisoTexto, styles.avisoEnlace]}>Política de privacidad</Text>
+                                    </Pressable>
+                                </View>
+
                                 <View style={styles.filaFinal}>
                                     <Pressable
                                         style={({ pressed }) => [styles.botonSecundario, pressed && styles.botonPulsado]}
@@ -600,4 +615,19 @@ const styles = StyleSheet.create({
     fechaItemActivo: { backgroundColor: "#10233E", borderRadius: 8, marginHorizontal: 4 },
     fechaItemTexto: { fontSize: 15, color: "#10233E" },
     fechaItemTextoActivo: { color: "#FFFFFF", fontWeight: "700" },
+    avisoLegal: {
+        flexDirection: "row",
+        flexWrap: "wrap",
+        justifyContent: "center",
+        marginBottom: 16,
+        paddingHorizontal: 8,
+    },
+    avisoTexto: {
+        fontSize: 12,
+        color: "#6B85A8",
+        lineHeight: 18,
+    },
+    avisoEnlace: {
+        fontWeight: "700",
+    },
 });
