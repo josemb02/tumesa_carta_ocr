@@ -30,6 +30,11 @@
 #     * audit logs + request_id + logging uniforme
 # -------------------------------------------------------------------
 
+import secrets
+import hashlib
+
+import resend
+
 from datetime import date, datetime, timezone, timedelta
 
 from fastapi import FastAPI, Depends, HTTPException, status, Request
@@ -43,8 +48,8 @@ from .config import settings
 from .database import get_db
 import httpx
 
-from .models import User, Checkin, UserPointsTotal, GroupMember, UserAuthProvider
-from .schemas import RegisterRequest, LoginRequest, TokenResponse, RefreshRequest, AvatarUpdateRequest, GoogleAuthRequest, ChangePasswordRequest
+from .models import User, Checkin, UserPointsTotal, GroupMember, UserAuthProvider, PasswordResetToken
+from .schemas import RegisterRequest, LoginRequest, TokenResponse, RefreshRequest, AvatarUpdateRequest, GoogleAuthRequest, ChangePasswordRequest, ForgotPasswordRequest, ResetPasswordRequest
 from .auth import (
     hash_password,
     verify_password,
@@ -812,6 +817,112 @@ def auth_me_change_password(
     db.commit()
 
     return {"mensaje": "Contraseña actualizada correctamente."}
+
+
+# -------------------------------------------------------------------
+# RECUPERACIÓN DE CONTRASEÑA
+# -------------------------------------------------------------------
+
+@app.post("/auth/forgot-password", status_code=200)
+def forgot_password(
+    payload: ForgotPasswordRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """
+    Solicita recuperación de contraseña.
+    Siempre devuelve 200 aunque el email no exista (seguridad OWASP A01).
+    Envía un email con link válido 1 hora si el email existe.
+    """
+    ip = getattr(request.state, "client_ip", "unknown")
+    rate_limit(key=f"forgot_password:{ip}", max_requests=3, window_seconds=3600)
+
+    # Buscamos el usuario — si no existe devolvemos 200 igualmente
+    user = db.query(User).filter(User.email == payload.email.lower().strip()).first()
+    if not user or not user.email:
+        return {"detail": "Si el email existe recibirás un correo"}
+
+    # Invalidar tokens anteriores del mismo usuario
+    db.query(PasswordResetToken).filter(
+        PasswordResetToken.user_id == user.id,
+        PasswordResetToken.used_at.is_(None),
+    ).delete()
+    db.flush()
+
+    # Generar token seguro y guardarlo hasheado
+    raw_token = secrets.token_urlsafe(32)
+    token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+    expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
+
+    reset_token = PasswordResetToken(
+        user_id=user.id,
+        token_hash=token_hash,
+        expires_at=expires_at,
+    )
+    db.add(reset_token)
+    db.commit()
+
+    # Enviar email con Resend
+    if settings.RESEND_API_KEY:
+        resend.api_key = settings.RESEND_API_KEY
+        reset_link = f"beermap://reset-password?token={raw_token}"
+        try:
+            resend.Emails.send({
+                "from": "BeerNow <noreply@beer-now.com>",
+                "to": user.email,
+                "subject": "Recupera tu contraseña de BeerNow",
+                "html": f"""
+                <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px">
+                  <h2 style="color:#10233E">Recupera tu contraseña</h2>
+                  <p>Hemos recibido una solicitud para restablecer la contraseña de tu cuenta BeerNow.</p>
+                  <p>Pulsa el botón para crear una contraseña nueva. El enlace caduca en <strong>1 hora</strong>.</p>
+                  <a href="{reset_link}"
+                     style="display:inline-block;background:#10233E;color:#fff;padding:14px 28px;
+                            border-radius:8px;text-decoration:none;font-weight:700;margin:16px 0">
+                    Restablecer contraseña
+                  </a>
+                  <p style="color:#888;font-size:13px">Si no solicitaste esto ignora este email.</p>
+                  <p style="color:#888;font-size:13px">El equipo de BeerNow</p>
+                </div>
+                """,
+            })
+        except Exception:
+            pass  # No revelar si el envío falló
+
+    return {"detail": "Si el email existe recibirás un correo"}
+
+
+@app.post("/auth/reset-password", status_code=200)
+def reset_password(
+    payload: ResetPasswordRequest,
+    db: Session = Depends(get_db),
+):
+    """
+    Restablece la contraseña usando el token del email.
+    """
+    token_hash = hashlib.sha256(payload.token.encode()).hexdigest()
+
+    reset_token = db.query(PasswordResetToken).filter(
+        PasswordResetToken.token_hash == token_hash,
+        PasswordResetToken.used_at.is_(None),
+    ).first()
+
+    if not reset_token:
+        raise HTTPException(status_code=400, detail="Token inválido o expirado")
+
+    if reset_token.expires_at < datetime.now(timezone.utc):
+        raise HTTPException(status_code=400, detail="Token inválido o expirado")
+
+    # Actualizar contraseña y marcar token como usado
+    user = db.query(User).filter(User.id == reset_token.user_id).first()
+    if not user:
+        raise HTTPException(status_code=400, detail="Token inválido o expirado")
+
+    user.password_hash = hash_password(payload.password_nuevo)
+    reset_token.used_at = datetime.now(timezone.utc)
+    db.commit()
+
+    return {"detail": "Contraseña actualizada correctamente"}
 
 
 # -------------------------------------------------------------------

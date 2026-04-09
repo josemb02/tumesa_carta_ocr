@@ -173,10 +173,7 @@ export default function Login() {
                         {/* Enlace de recuperación de contraseña */}
                         <Pressable
                             style={styles.olvidaste}
-                            onPress={() => Alert.alert(
-                                "Recuperar contraseña",
-                                "Para recuperar tu contraseña contacta con soporte en beermap@soporte.com"
-                            )}
+                            onPress={() => router.push("/recuperar-password" as never)}
                         >
                             <Text style={styles.olvidasteTexto}>¿Olvidaste tu contraseña?</Text>
                         </Pressable>

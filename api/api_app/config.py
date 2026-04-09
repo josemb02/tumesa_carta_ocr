@@ -83,6 +83,11 @@ class Settings:
         self.GOOGLE_CLIENT_ID = _get_env("GOOGLE_CLIENT_ID", "")
 
         # -------------------------------------------------
+        # Resend (envío de emails transaccionales)
+        # -------------------------------------------------
+        self.RESEND_API_KEY = _get_env("RESEND_API_KEY", "")
+
+        # -------------------------------------------------
         # Cloudinary
         # -------------------------------------------------
         # Se aceptan los nombres en inglés y los originales en español
@@ -135,6 +140,8 @@ LOGIN_BLOCK_SECONDS = settings.LOGIN_BLOCK_SECONDS
 REDIS_SOCKET_TIMEOUT = settings.REDIS_SOCKET_TIMEOUT
 
 GOOGLE_CLIENT_ID = settings.GOOGLE_CLIENT_ID
+
+RESEND_API_KEY = settings.RESEND_API_KEY
 
 CLOUDINARY_CLOUD_NAME = settings.CLOUDINARY_CLOUD_NAME
 CLOUDINARY_API_KEY = settings.CLOUDINARY_API_KEY

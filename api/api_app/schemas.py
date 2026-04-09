@@ -233,4 +233,24 @@ class RankingEntry(BaseModel):
     points: int
     avatar_url: Optional[str] = None
     ciudad: Optional[str] = None
+
+
+# =========================================================
+# RECUPERACIÓN DE CONTRASEÑA
+# =========================================================
+
+class ForgotPasswordRequest(BaseModel):
+    """
+    Solicitud de recuperación de contraseña.
+    Solo necesita el email del usuario.
+    """
+    email: str = Field(min_length=3, max_length=254)
+
+
+class ResetPasswordRequest(BaseModel):
+    """
+    Restablecimiento de contraseña con el token recibido por email.
+    """
+    token: str = Field(min_length=1)
+    password_nuevo: str = Field(min_length=8, max_length=128)
     pais: Optional[str] = None
