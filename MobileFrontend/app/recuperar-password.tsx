@@ -20,14 +20,28 @@ export default function RecuperarPassword() {
         }
         try {
             setCargando(true);
-            await fetch(`${API_URL}/auth/forgot-password`, {
+            const res = await fetch(`${API_URL}/auth/forgot-password`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ email: emailLimpio }),
             });
+            if (res.status === 429) {
+                Alert.alert(
+                    "Demasiados intentos",
+                    "Has solicitado demasiados enlaces seguidos. Espera 1 hora antes de volver a intentarlo."
+                );
+                return;
+            }
             setEnviado(true);
-        } catch {
-            Alert.alert("Error", "Sin conexión. Comprueba tu internet");
+        } catch (error: any) {
+            if (error?.status === 429 || (typeof error?.message === 'string' && error.message.includes('429'))) {
+                Alert.alert(
+                    "Demasiados intentos",
+                    "Has solicitado demasiados enlaces seguidos. Espera 1 hora antes de volver a intentarlo."
+                );
+            } else {
+                Alert.alert("Error", "Sin conexión. Comprueba tu internet");
+            }
         } finally {
             setCargando(false);
         }
