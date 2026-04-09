@@ -865,7 +865,7 @@ def forgot_password(
     # Enviar email con Resend
     if settings.RESEND_API_KEY:
         resend.api_key = settings.RESEND_API_KEY
-        reset_link = f"beermap://reset-password?token={raw_token}"
+        reset_link = f"https://beer-now.com/reset-password?token={raw_token}"
         try:
             resend.Emails.send({
                 "from": "BeerNow <noreply@beer-now.com>",
