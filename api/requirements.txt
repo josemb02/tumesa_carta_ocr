@@ -18,3 +18,4 @@ redis
 
 cloudinary
 resend
+cryptography

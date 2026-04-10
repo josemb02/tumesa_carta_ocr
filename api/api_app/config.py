@@ -88,6 +88,13 @@ class Settings:
         self.RESEND_API_KEY = _get_env("RESEND_API_KEY", "")
 
         # -------------------------------------------------
+        # AdMob SSV (Server Side Verification)
+        # -------------------------------------------------
+        # URL para obtener las claves públicas con las que verificar
+        # la firma de las recompensas de vídeo de AdMob.
+        self.ADMOB_SSV_PUBLIC_KEYS_URL = "https://www.gstatic.com/admob/reward/verifier-keys.json"
+
+        # -------------------------------------------------
         # Cloudinary
         # -------------------------------------------------
         # Se aceptan los nombres en inglés y los originales en español
@@ -142,6 +149,8 @@ REDIS_SOCKET_TIMEOUT = settings.REDIS_SOCKET_TIMEOUT
 GOOGLE_CLIENT_ID = settings.GOOGLE_CLIENT_ID
 
 RESEND_API_KEY = settings.RESEND_API_KEY
+
+ADMOB_SSV_PUBLIC_KEYS_URL = settings.ADMOB_SSV_PUBLIC_KEYS_URL
 
 CLOUDINARY_CLOUD_NAME = settings.CLOUDINARY_CLOUD_NAME
 CLOUDINARY_API_KEY = settings.CLOUDINARY_API_KEY

@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
     ActivityIndicator,
     Alert,
@@ -12,6 +12,7 @@ import {
 import { useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { usarAuth } from "../../contexto/ContextoAuth";
+import { precargarAnuncioRecompensado, mostrarAnuncioRecompensado } from "../../servicios/admob";
 import {
     obtenerCatalogo,
     comprarIcono,
@@ -36,11 +37,18 @@ type IconoCatalogo = {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function Tienda() {
-    const { token } = usarAuth();
+    const { token, usuario } = usarAuth();
     const [iconos, setIconos] = useState<IconoCatalogo[]>([]);
     const [puntos, setPuntos] = useState(0);
     const [cargando, setCargando] = useState(true);
     const [accionando, setAccionando] = useState<string | null>(null); // id del icono en proceso
+    const [cargandoVideo, setCargandoVideo] = useState(false);
+
+    // Precarga el anuncio al montar la pantalla
+    useEffect(() => {
+        const limpiar = precargarAnuncioRecompensado();
+        return limpiar;
+    }, []);
 
     useFocusEffect(
         useCallback(() => {
@@ -61,6 +69,28 @@ export default function Tienda() {
         } catch {}
         finally { setCargando(false); }
     }
+
+    /*
+     * Muestra un vídeo recompensado y suma 20 puntos al completarlo.
+     */
+    const manejarVerVideo = async () => {
+        try {
+            setCargandoVideo(true);
+            const { puntosGanados, totalPuntos } = await mostrarAnuncioRecompensado(
+                token!,
+                usuario!.id
+            );
+            Alert.alert(
+                "¡Genial! 🍺",
+                `Has ganado ${puntosGanados} puntos.\nTotal: ${totalPuntos} puntos`
+            );
+            await cargarDatos();
+        } catch {
+            Alert.alert("Error", "No se pudo cargar el vídeo. Inténtalo de nuevo.");
+        } finally {
+            setCargandoVideo(false);
+        }
+    };
 
     /*
      * Inicia la compra de un icono tras confirmación del usuario.
@@ -111,7 +141,31 @@ export default function Tienda() {
                     <ActivityIndicator color="#10233E" size="large" />
                 </View>
             ) : (
-                <FlatList
+                <>
+                    {/* Sección de vídeo recompensado */}
+                    <View style={s.seccionVideo}>
+                        <Text style={s.videoTitulo}>¿Quieres más puntos? 🎬</Text>
+                        <Text style={s.videoSubtitulo}>
+                            Ve un vídeo corto y gana 20 puntos gratis
+                        </Text>
+                        <Pressable
+                            style={({ pressed }) => [
+                                s.botonVideo,
+                                pressed && s.botonVideoPulsado,
+                                cargandoVideo && s.botonDeshabilitado,
+                            ]}
+                            onPress={manejarVerVideo}
+                            disabled={cargandoVideo}
+                        >
+                            {cargandoVideo ? (
+                                <ActivityIndicator color="#fff" />
+                            ) : (
+                                <Text style={s.textoBotonVideo}>▶ Ver vídeo +20 pts</Text>
+                            )}
+                        </Pressable>
+                    </View>
+
+                    <FlatList
                     data={iconos}
                     keyExtractor={item => item.id}
                     contentContainerStyle={s.lista}
@@ -126,6 +180,7 @@ export default function Tienda() {
                         />
                     )}
                 />
+                </>
             )}
         </SafeAreaView>
     );
@@ -270,4 +325,41 @@ const s = StyleSheet.create({
 
     btnDeshabilitado: { backgroundColor: "#E2E8F0" },
     btnTextoDeshabilitado: { fontSize: 12, fontWeight: "600", color: "#9AAABB" },
+
+    // Sección vídeo recompensado
+    seccionVideo: {
+        backgroundColor: "#FFF8E7",
+        borderRadius: 14,
+        padding: 18,
+        marginHorizontal: 16,
+        marginBottom: 16,
+        borderWidth: 1,
+        borderColor: "#FFE082",
+        alignItems: "center",
+    },
+    videoTitulo: {
+        fontSize: 16,
+        fontWeight: "700",
+        color: "#10233E",
+        marginBottom: 4,
+    },
+    videoSubtitulo: {
+        fontSize: 13,
+        color: "#6B85A8",
+        marginBottom: 14,
+        textAlign: "center",
+    },
+    botonVideo: {
+        backgroundColor: "#F5A623",
+        borderRadius: 10,
+        paddingVertical: 12,
+        paddingHorizontal: 28,
+    },
+    botonVideoPulsado: { opacity: 0.85 },
+    textoBotonVideo: {
+        color: "#fff",
+        fontWeight: "700",
+        fontSize: 15,
+    },
+    botonDeshabilitado: { opacity: 0.65 },
 });
