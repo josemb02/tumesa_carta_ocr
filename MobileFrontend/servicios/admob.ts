@@ -1,5 +1,12 @@
 // servicios/admob.ts
-// Gestiona la carga y visualización del anuncio recompensado de AdMob
+// Gestiona la carga y visualización del anuncio recompensado de AdMob.
+//
+// FLUJO SSV (Server-Side Verification):
+// 1. El usuario pulsa "Ver vídeo" → se muestra el anuncio
+// 2. El usuario completa el vídeo → AdMob llama directamente al backend
+//    vía SSV callback con firma criptográfica verificada
+// 3. El backend verifica la firma y suma los puntos
+// 4. El frontend refresca los puntos del usuario llamando a /auth/me/stats
 
 import { Platform } from "react-native";
 import {
@@ -8,7 +15,6 @@ import {
     TestIds,
     AdEventType,
 } from "react-native-google-mobile-ads";
-import { hacerPeticion } from "./peticion";
 
 // ID real según plataforma, ID de prueba en desarrollo
 const AD_UNIT_ID = __DEV__
@@ -20,7 +26,7 @@ const AD_UNIT_ID = __DEV__
 let rewardedAd: RewardedAd | null = null;
 
 /**
- * Precarga el anuncio recompensado.
+ * Precarga el anuncio recompensado para que esté listo al instante.
  * Llamar al montar la pantalla de tienda.
  * Devuelve función de limpieza para el useEffect.
  */
@@ -48,42 +54,36 @@ export function precargarAnuncioRecompensado(): () => void {
 }
 
 /**
- * Muestra el anuncio y llama al backend para sumar los puntos al completarlo.
+ * Muestra el anuncio recompensado.
+ * Cuando el usuario completa el vídeo, AdMob llama automáticamente
+ * al backend vía SSV para verificar y sumar los puntos.
+ * El frontend solo necesita saber que el usuario completó el vídeo
+ * para refrescar los puntos desde la API.
+ *
+ * @returns Promise que resuelve true si el usuario completó el vídeo
  */
-export async function mostrarAnuncioRecompensado(
-    token: string,
-    userId: string
-): Promise<{ puntosGanados: number; totalPuntos: number }> {
+export async function mostrarAnuncioRecompensado(): Promise<boolean> {
     return new Promise((resolve, reject) => {
         if (!rewardedAd) {
             reject(new Error("Anuncio no cargado"));
             return;
         }
 
+        // El usuario completó el vídeo — AdMob se encarga del SSV al backend
         const limpiarRecompensa = rewardedAd!.addAdEventListener(
             RewardedAdEventType.EARNED_REWARD,
-            async (reward) => {
+            () => {
                 limpiarRecompensa();
-                try {
-                    const respuesta = await hacerPeticion("/rewards/video", {
-                        metodo: "POST",
-                        token,
-                        body: {
-                            key_id: "1",
-                            signature: "dev",
-                            user_id: userId,
-                            reward_item: reward.type,
-                            reward_amount: reward.amount,
-                            transaction_id: `${userId}_${Date.now()}`,
-                        },
-                    });
-                    resolve({
-                        puntosGanados: respuesta.puntos_ganados,
-                        totalPuntos: respuesta.total_puntos,
-                    });
-                } catch (error) {
-                    reject(error);
-                }
+                resolve(true);
+            }
+        );
+
+        // El usuario cerró el anuncio sin completarlo
+        const limpiarCerrado = rewardedAd!.addAdEventListener(
+            AdEventType.CLOSED,
+            () => {
+                limpiarCerrado();
+                resolve(false);
             }
         );
 

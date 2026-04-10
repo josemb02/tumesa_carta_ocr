@@ -71,23 +71,27 @@ export default function Tienda() {
     }
 
     /*
-     * Muestra un vídeo recompensado y suma 20 puntos al completarlo.
+     * Muestra un vídeo recompensado.
+     * AdMob verifica el SSV con el backend automáticamente al completarlo.
+     * El frontend solo refresca los puntos tras un breve retraso.
      */
     const manejarVerVideo = async () => {
         try {
             setCargandoVideo(true);
-            const { puntosGanados, totalPuntos } = await mostrarAnuncioRecompensado(
-                token!,
-                usuario!.id
-            );
-            Alert.alert(
-                "¡Genial! 🍺",
-                `Has ganado ${puntosGanados} puntos.\nTotal: ${totalPuntos} puntos`
-            );
-            await cargarDatos();
+            // Mostrar el vídeo — AdMob verificará SSV con el backend automáticamente
+            const completo = await mostrarAnuncioRecompensado();
+            if (completo) {
+                // Esperar un momento para que el SSV de AdMob llegue al backend
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                // Refrescar puntos desde la API
+                await cargarDatos();
+                Alert.alert("¡Genial! 🍺", "Has ganado 20 puntos. ¡Sigue disfrutando!");
+            }
         } catch {
             Alert.alert("Error", "No se pudo cargar el vídeo. Inténtalo de nuevo.");
         } finally {
+            // Precargar el siguiente anuncio
+            precargarAnuncioRecompensado();
             setCargandoVideo(false);
         }
     };

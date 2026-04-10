@@ -254,21 +254,3 @@ class ResetPasswordRequest(BaseModel):
     token: str = Field(min_length=1)
     password_nuevo: str = Field(min_length=8, max_length=128)
 
-
-# =========================================================
-# ADMOB SSV (recompensa de vídeo)
-# =========================================================
-
-class RewardVideoRequest(BaseModel):
-    """
-    Datos enviados por el cliente tras completar un vídeo recompensado.
-    El backend los usa para verificar la firma SSV de AdMob.
-    """
-    key_id: str
-    signature: str
-    user_id: str
-    reward_item: str = "puntos"
-    reward_amount: int = 20
-    transaction_id: str
-    custom_data: str = ""
-    pais: Optional[str] = None
