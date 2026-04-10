@@ -54,13 +54,13 @@ async def admob_ssv_callback(
     ad_network: str = Query(default=""),
     ad_unit: str = Query(default=""),
     custom_data: str = Query(default=""),
-    key_id: int = Query(...),
-    reward_amount: int = Query(...),
-    reward_item: str = Query(...),
-    signature: str = Query(...),
-    timestamp: int = Query(...),
-    transaction_id: str = Query(...),
-    user_id: str = Query(...),
+    key_id: int = Query(default=0),
+    reward_amount: int = Query(default=0),
+    reward_item: str = Query(default=""),
+    signature: str = Query(default=""),
+    timestamp: int = Query(default=0),
+    transaction_id: str = Query(default=""),
+    user_id: str = Query(default=""),
     db: Session = Depends(get_db),
 ):
     """
@@ -69,6 +69,10 @@ async def admob_ssv_callback(
 
     Documentación: https://developers.google.com/admob/android/ssv
     """
+    # Si es una llamada de verificación de AdMob (sin parámetros reales), devolver 200
+    if not signature or not transaction_id or not user_id:
+        return {"status": "ok", "mensaje": "verificación"}
+
     # Verificar firma SSV con clave pública de AdMob
     clave_pem = await _obtener_clave_publica(str(key_id))
     if not clave_pem:
