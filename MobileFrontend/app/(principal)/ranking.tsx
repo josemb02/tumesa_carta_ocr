@@ -16,6 +16,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { usarAuth } from "../../contexto/ContextoAuth";
 import { hacerPeticion } from "../../servicios/api";
 import { AvatarCirculo } from "../../componentes/AvatarCirculo";
+import { useT } from "../../i18n";
 
 type EntradaRanking = {
     user_id: string;
@@ -50,6 +51,7 @@ type Periodo = "historico" | "semana" | "mes";
 
 export default function Ranking() {
     const { token, usuario } = usarAuth();
+    const t = useT();
 
     const [ambito,  setAmbito]  = useState<Ambito>("global");
     const [periodo, setPeriodo] = useState<Periodo>("historico");
@@ -133,14 +135,14 @@ export default function Ranking() {
 
             {/* Cabecera */}
             <View style={s.header}>
-                <Text style={s.headerTitulo}>Ranking</Text>
+                <Text style={s.headerTitulo}>{t("ranking.titulo")}</Text>
                 {miPosicion >= 0 ? (
                     <View style={s.miPosicionBadge}>
                         <Text style={s.miPosicionTexto}>#{miPosicion + 1}</Text>
                     </View>
                 ) : fueraDelTop ? (
                     <View style={s.fueraBadge}>
-                        <Text style={s.fueraBadgeTexto}>Fuera del top 100</Text>
+                        <Text style={s.fueraBadgeTexto}>{t("ranking.fuera_top")}</Text>
                     </View>
                 ) : null}
             </View>
@@ -162,9 +164,9 @@ export default function Ranking() {
 
             {/* Fila 2 — Período (segmentado, siempre visible) */}
             <View style={s.periodoContenedor}>
-                <PeriodoBtn label="Histórico"   activo={periodo === "historico"} onPress={() => cambiarPeriodo("historico")} />
-                <PeriodoBtn label="Esta semana" activo={periodo === "semana"}    onPress={() => cambiarPeriodo("semana")} />
-                <PeriodoBtn label="Este mes"    activo={periodo === "mes"}       onPress={() => cambiarPeriodo("mes")} />
+                <PeriodoBtn label={t("ranking.historico")}   activo={periodo === "historico"} onPress={() => cambiarPeriodo("historico")} />
+                <PeriodoBtn label={t("ranking.esta_semana")} activo={periodo === "semana"}    onPress={() => cambiarPeriodo("semana")} />
+                <PeriodoBtn label={t("ranking.este_mes")}    activo={periodo === "mes"}       onPress={() => cambiarPeriodo("mes")} />
             </View>
 
             {/* Podio top 3 */}
@@ -183,7 +185,7 @@ export default function Ranking() {
                 </View>
             ) : ranking.length === 0 ? (
                 <View style={s.centrado}>
-                    <Text style={s.emptyTitulo}>Aún no hay nadie en este ranking</Text>
+                    <Text style={s.emptyTitulo}>{t("ranking.sin_datos")}</Text>
                 </View>
             ) : (
                 <FlatList

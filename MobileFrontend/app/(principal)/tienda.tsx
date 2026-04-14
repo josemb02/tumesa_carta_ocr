@@ -12,6 +12,7 @@ import {
 import { useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { usarAuth } from "../../contexto/ContextoAuth";
+import { useT } from "../../i18n";
 import { precargarAnuncioRecompensado, mostrarAnuncioRecompensado } from "../../servicios/admob";
 import {
     obtenerCatalogo,
@@ -38,6 +39,7 @@ type IconoCatalogo = {
 
 export default function Tienda() {
     const { token, usuario } = usarAuth();
+    const t = useT();
     const [iconos, setIconos] = useState<IconoCatalogo[]>([]);
     const [puntos, setPuntos] = useState(0);
     const [cargando, setCargando] = useState(true);
@@ -83,10 +85,7 @@ export default function Tienda() {
 
             // En Expo Go AdMob no está disponible — avisar al usuario
             if (!completo) {
-                Alert.alert(
-                    "Vídeo no disponible",
-                    "Los vídeos recompensados solo funcionan en la app instalada. Descarga BeerNow para ganar puntos."
-                );
+                Alert.alert(t("tienda.video_no_disponible"), t("tienda.video_no_disponible_sub"));
                 return;
             }
 
@@ -95,10 +94,10 @@ export default function Tienda() {
                 await new Promise(resolve => setTimeout(resolve, 2000));
                 // Refrescar puntos desde la API
                 await cargarDatos();
-                Alert.alert("¡Genial! 🍺", "Has ganado 20 puntos. ¡Sigue disfrutando!");
+                Alert.alert(t("tienda.video_exito"), t("tienda.video_exito_sub"));
             }
         } catch {
-            Alert.alert("Error", "No se pudo cargar el vídeo. Inténtalo de nuevo.");
+            Alert.alert(t("general.error"), t("tienda.video_error"));
         } finally {
             // Precargar el siguiente anuncio
             precargarAnuncioRecompensado();
@@ -113,12 +112,12 @@ export default function Tienda() {
         if (!token) return;
 
         Alert.alert(
-            `Comprar ${icono.nombre}`,
-            `¿Gastar ${icono.coste_puntos} puntos para desbloquear ${icono.emoji} ${icono.nombre}?`,
+            `${t("tienda.comprar")} ${icono.nombre}`,
+            `${icono.coste_puntos} pts → ${icono.emoji} ${icono.nombre}?`,
             [
-                { text: "Cancelar", style: "cancel" },
+                { text: t("general.cancelar"), style: "cancel" },
                 {
-                    text: "Comprar",
+                    text: t("tienda.comprar"),
                     onPress: async () => {
                         try {
                             setAccionando(icono.id);
@@ -126,9 +125,9 @@ export default function Tienda() {
                             setPuntos(resultado.puntos_restantes ?? 0);
                             // Recargamos el catálogo para reflejar el nuevo estado
                             await cargarDatos();
-                            Alert.alert("¡Conseguido!", `${icono.emoji} ${icono.nombre} es tuyo.`);
+                            Alert.alert("🎉", `${icono.emoji} ${icono.nombre} ${t("tienda.compra_exito")}`);
                         } catch (err: any) {
-                            Alert.alert("Error", err?.message || "No se pudo completar la compra.");
+                            Alert.alert(t("general.error"), err?.message || t("tienda.compra_error"));
                         } finally {
                             setAccionando(null);
                         }
@@ -142,7 +141,7 @@ export default function Tienda() {
         <SafeAreaView style={s.root}>
             {/* Cabecera */}
             <View style={s.header}>
-                <Text style={s.headerTitulo}>Tienda</Text>
+                <Text style={s.headerTitulo}>{t("tienda.titulo")}</Text>
                 <View style={s.puntosChip}>
                     <Ionicons name="star" size={14} color="#F7C948" />
                     <Text style={s.puntosNum}>{puntos}</Text>
@@ -170,12 +169,12 @@ export default function Tienda() {
                             <Text style={s.filaVideoEmoji}>▶</Text>
                         </View>
                         <View style={s.filaVideoTextos}>
-                            <Text style={s.filaVideoTitulo}>Ver un vídeo corto</Text>
-                            <Text style={s.filaVideoSub}>Gana 20 puntos gratis</Text>
+                            <Text style={s.filaVideoTitulo}>{t("tienda.ver_video")}</Text>
+                            <Text style={s.filaVideoSub}>{t("tienda.ver_video_sub")}</Text>
                         </View>
                         {cargandoVideo
                             ? <ActivityIndicator color="#10233E" size="small" />
-                            : <Text style={s.filaVideoPts}>+20 pts</Text>
+                            : <Text style={s.filaVideoPts}>{t("tienda.video_pts")}</Text>
                         }
                     </Pressable>
 
@@ -213,6 +212,7 @@ function FilaIcono({
     accionando: boolean;
     onComprar: () => void;
 }) {
+    const t = useT();
     /*
      * Estado del botón de acción:
      * - poseido       → "Tienes este" (informativo, sin acción — el icono se elige en cada check-in)
@@ -231,7 +231,7 @@ function FilaIcono({
         // Ya lo tiene — informativo, sin acción. El icono se elige en cada check-in.
         boton = (
             <View style={[s.btn, s.btnTienes]}>
-                <Text style={s.btnTextoTienes}>Tienes este</Text>
+                <Text style={s.btnTextoTienes}>{t("tienda.tienes_este")}</Text>
             </View>
         );
     } else if (puntos >= icono.coste_puntos) {
@@ -267,7 +267,7 @@ function FilaIcono({
                     </Text>
                 )}
                 {icono.coste_puntos === 0 && (
-                    <Text style={s.gratisBadge}>Gratis</Text>
+                    <Text style={s.gratisBadge}>{t("tienda.gratis")}</Text>
                 )}
             </View>
 

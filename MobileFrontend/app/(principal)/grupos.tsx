@@ -21,6 +21,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { usarAuth } from "../../contexto/ContextoAuth";
 import { hacerPeticion } from "../../servicios/api";
 import { AvatarCirculo } from "../../componentes/AvatarCirculo";
+import { useT } from "../../i18n";
 
 type Grupo = { id: string; name: string; join_code: string };
 type Miembro = { id: string; username: string; avatar_url: string | null };
@@ -60,6 +61,7 @@ function formatearHora(iso: string): string {
 
 export default function Grupos() {
     const { token } = usarAuth();
+    const t = useT();
     const [grupos, setGrupos] = useState<Grupo[]>([]);
     const [cargando, setCargando] = useState(true);
     // Spinner del pull-to-refresh (no tapa la pantalla como el de carga inicial)
@@ -104,7 +106,7 @@ export default function Grupos() {
     return (
         <SafeAreaView style={s.root}>
             <View style={s.header}>
-                <Text style={s.headerTitulo}>Grupos</Text>
+                <Text style={s.headerTitulo}>{t("grupos.titulo")}</Text>
                 <View style={s.headerBtns}>
                     <Pressable style={s.headerBtn} onPress={() => setModal("unirse")}>
                         <Ionicons name="enter-outline" size={18} color="#10233E" />
@@ -122,14 +124,14 @@ export default function Grupos() {
                     <View style={s.emptyIcono}>
                         <Ionicons name="people-outline" size={32} color="#9AAABB" />
                     </View>
-                    <Text style={s.emptyTitulo}>Sin grupos aún</Text>
-                    <Text style={s.emptyTexto}>Crea un grupo o únete con un código</Text>
+                    <Text style={s.emptyTitulo}>{t("grupos.sin_grupos")}</Text>
+                    <Text style={s.emptyTexto}>{t("grupos.sin_grupos_sub")}</Text>
                     <View style={s.emptyBtns}>
                         <Pressable style={s.emptyBtn} onPress={() => setModal("crear")}>
-                            <Text style={s.emptyBtnTexto}>Crear grupo</Text>
+                            <Text style={s.emptyBtnTexto}>{t("grupos.crear_grupo")}</Text>
                         </Pressable>
                         <Pressable style={[s.emptyBtn, s.emptyBtnSec]} onPress={() => setModal("unirse")}>
-                            <Text style={[s.emptyBtnTexto, s.emptyBtnTextoSec]}>Unirse</Text>
+                            <Text style={[s.emptyBtnTexto, s.emptyBtnTextoSec]}>{t("grupos.unirse_grupo")}</Text>
                         </Pressable>
                     </View>
                 </View>
@@ -181,6 +183,7 @@ function DetalleGrupo({ grupo, token, onVolver }: {
     onVolver: () => void;
 }) {
     const { usuario } = usarAuth();
+    const t = useT();
     const [tab, setTab] = useState<TabDetalle>("chat");
     const [miembros, setMiembros] = useState<Miembro[]>([]);
     const [ranking, setRanking] = useState<RankingEntrada[]>([]);
@@ -234,7 +237,7 @@ function DetalleGrupo({ grupo, token, onVolver }: {
             setMensaje("");
             setTimeout(() => flatRef.current?.scrollToEnd({ animated: true }), 100);
         } catch (e: any) {
-            Alert.alert("Error", e?.message || "No se pudo enviar");
+            Alert.alert(t("general.error"), e?.message || t("grupos.error_enviar"));
         } finally { setEnviando(false); }
     }
 
@@ -261,10 +264,10 @@ function DetalleGrupo({ grupo, token, onVolver }: {
 
             {/* Tabs */}
             <View style={s.detalleTabs}>
-                {(["chat", "ranking", "miembros"] as TabDetalle[]).map(t => (
-                    <Pressable key={t} style={[s.detalleTab, tab === t && s.detalleTabActivo]} onPress={() => setTab(t)}>
-                        <Text style={[s.detalleTabLabel, tab === t && s.detalleTabLabelActivo]}>
-                            {t.charAt(0).toUpperCase() + t.slice(1)}
+                {(["chat", "ranking", "miembros"] as TabDetalle[]).map(tabKey => (
+                    <Pressable key={tabKey} style={[s.detalleTab, tab === tabKey && s.detalleTabActivo]} onPress={() => setTab(tabKey)}>
+                        <Text style={[s.detalleTabLabel, tab === tabKey && s.detalleTabLabelActivo]}>
+                            {t(`grupos.${tabKey}`)}
                         </Text>
                     </Pressable>
                 ))}
@@ -290,7 +293,7 @@ function DetalleGrupo({ grupo, token, onVolver }: {
                                 onContentSizeChange={() => flatRef.current?.scrollToEnd()}
                                 ListEmptyComponent={
                                     <View style={s.chatVacio}>
-                                        <Text style={s.chatVacioTexto}>Sé el primero en escribir algo 👋</Text>
+                                        <Text style={s.chatVacioTexto}>{t("grupos.chat_vacio")}</Text>
                                     </View>
                                 }
                                 renderItem={({ item }) => {
@@ -316,7 +319,7 @@ function DetalleGrupo({ grupo, token, onVolver }: {
                                 <TextInput
                                     value={mensaje}
                                     onChangeText={setMensaje}
-                                    placeholder="Escribe un mensaje..."
+                                    placeholder={t("grupos.escribe_mensaje")}
                                     placeholderTextColor="#B0BAC8"
                                     maxLength={500}
                                     style={s.chatTextInput}
@@ -420,19 +423,20 @@ function DetalleGrupo({ grupo, token, onVolver }: {
 function ModalCrear({ visible, token, onCerrar, onExito }: {
     visible: boolean; token: string | null; onCerrar: () => void; onExito: () => void;
 }) {
+    const t = useT();
     const [nombre, setNombre] = useState("");
     const [enviando, setEnviando] = useState(false);
 
     async function crear() {
         const n = nombre.trim();
-        if (n.length < 3) { Alert.alert("Error", "El nombre debe tener al menos 3 caracteres"); return; }
+        if (n.length < 3) { Alert.alert(t("general.error"), t("grupos.error_nombre")); return; }
         try {
             setEnviando(true);
             await hacerPeticion("/groups", { metodo: "POST", token, body: { name: n } });
             setNombre("");
             onExito();
         } catch (e: any) {
-            Alert.alert("Error", e?.message || "No se pudo crear el grupo");
+            Alert.alert(t("general.error"), e?.message || t("grupos.error_crear"));
         } finally { setEnviando(false); }
     }
 
@@ -443,18 +447,18 @@ function ModalCrear({ visible, token, onCerrar, onExito }: {
                     <Pressable style={s.sheet} onPress={() => {}}>
                         <View style={s.handle} />
                         <View style={s.sheetHeader}>
-                            <Text style={s.sheetTitulo}>Nuevo grupo</Text>
+                            <Text style={s.sheetTitulo}>{t("grupos.nuevo_grupo")}</Text>
                             <Pressable onPress={onCerrar}><Ionicons name="close" size={22} color="#4E5968" /></Pressable>
                         </View>
-                        <Text style={s.fieldLabel}>Nombre del grupo</Text>
+                        <Text style={s.fieldLabel}>{t("grupos.nombre_grupo")}</Text>
                         <TextInput
                             value={nombre} onChangeText={setNombre}
-                            placeholder="ej: Los del Viernes"
+                            placeholder={t("grupos.nombre_placeholder")}
                             placeholderTextColor="#B0BAC8"
                             maxLength={80} style={s.input} autoFocus
                         />
                         <Pressable style={({ pressed }) => [s.btn, enviando && s.btnOff, pressed && s.btnPress]} onPress={crear} disabled={enviando}>
-                            {enviando ? <ActivityIndicator color="#fff" size="small" /> : <Text style={s.btnLabel}>Crear grupo</Text>}
+                            {enviando ? <ActivityIndicator color="#fff" size="small" /> : <Text style={s.btnLabel}>{t("grupos.crear_grupo")}</Text>}
                         </Pressable>
                     </Pressable>
                 </Pressable>
@@ -468,19 +472,20 @@ function ModalCrear({ visible, token, onCerrar, onExito }: {
 function ModalUnirse({ visible, token, onCerrar, onExito }: {
     visible: boolean; token: string | null; onCerrar: () => void; onExito: () => void;
 }) {
+    const t = useT();
     const [codigo, setCodigo] = useState("");
     const [enviando, setEnviando] = useState(false);
 
     async function unirse() {
         const c = codigo.trim().toUpperCase();
-        if (c.length < 4) { Alert.alert("Error", "Introduce el código del grupo"); return; }
+        if (c.length < 4) { Alert.alert(t("general.error"), t("grupos.error_codigo")); return; }
         try {
             setEnviando(true);
             await hacerPeticion("/groups/join", { metodo: "POST", token, body: { join_code: c } });
             setCodigo("");
             onExito();
         } catch (e: any) {
-            Alert.alert("Error", e?.message || "Código incorrecto");
+            Alert.alert(t("general.error"), e?.message || t("grupos.error_codigo_incorrecto"));
         } finally { setEnviando(false); }
     }
 
@@ -491,19 +496,19 @@ function ModalUnirse({ visible, token, onCerrar, onExito }: {
                     <Pressable style={s.sheet} onPress={() => {}}>
                         <View style={s.handle} />
                         <View style={s.sheetHeader}>
-                            <Text style={s.sheetTitulo}>Unirse a un grupo</Text>
+                            <Text style={s.sheetTitulo}>{t("grupos.unirse_titulo")}</Text>
                             <Pressable onPress={onCerrar}><Ionicons name="close" size={22} color="#4E5968" /></Pressable>
                         </View>
-                        <Text style={s.fieldLabel}>Código de invitación</Text>
+                        <Text style={s.fieldLabel}>{t("grupos.codigo_invitacion")}</Text>
                         <TextInput
-                            value={codigo} onChangeText={t => setCodigo(t.toUpperCase())}
+                            value={codigo} onChangeText={val => setCodigo(val.toUpperCase())}
                             placeholder="ej: AB12CD" placeholderTextColor="#B0BAC8"
                             maxLength={10} autoCapitalize="characters" autoCorrect={false}
                             style={[s.input, s.inputCodigo]} autoFocus
                         />
-                        <Text style={s.inputHint}>El código lo comparte el creador del grupo</Text>
+                        <Text style={s.inputHint}>{t("grupos.codigo_hint")}</Text>
                         <Pressable style={({ pressed }) => [s.btn, enviando && s.btnOff, pressed && s.btnPress]} onPress={unirse} disabled={enviando}>
-                            {enviando ? <ActivityIndicator color="#fff" size="small" /> : <Text style={s.btnLabel}>Unirse</Text>}
+                            {enviando ? <ActivityIndicator color="#fff" size="small" /> : <Text style={s.btnLabel}>{t("grupos.unirse_grupo")}</Text>}
                         </Pressable>
                     </Pressable>
                 </Pressable>

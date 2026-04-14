@@ -19,6 +19,7 @@ import {
 import { Link, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { usarAuth } from "../contexto/ContextoAuth";
+import { useT } from "../i18n";
 
 // ─── Lista de países ──────────────────────────────────────────────────────────
 
@@ -50,18 +51,15 @@ const PAISES = [
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-/*
- * Traduce errores técnicos del backend a mensajes en español natural.
- */
-function mensajeAmigable(e: any): string {
+function mensajeAmigable(e: any, t: (key: string) => string): string {
     const raw = (e?.message ?? "").toLowerCase();
     if (raw.includes("network request failed") || raw.includes("failed to fetch") || raw.includes("network error")) {
-        return "Sin conexión. Comprueba tu internet";
+        return t("registro.error_red");
     }
     if (raw.includes("ya existe") || raw.includes("already") || raw.includes("duplicate")) {
-        return "Este email ya está registrado";
+        return t("registro.error_duplicado");
     }
-    return e?.message || "No se ha podido crear la cuenta";
+    return e?.message || t("registro.error_generico");
 }
 
 function validarEmail(email: string): boolean {
@@ -85,6 +83,7 @@ function formatearFechaVisible(fecha: Date): string {
 
 export default function Registro() {
     const router = useRouter();
+    const t = useT();
     const { registrarNuevoUsuario } = usarAuth();
 
     const [username, setUsername] = useState("");
@@ -113,23 +112,23 @@ export default function Registro() {
     const validarPaso1 = (): boolean => {
         const u = username.trim();
         if (u.length < 3 || u.length > 30) {
-            Alert.alert("Error", "El username debe tener entre 3 y 30 caracteres");
+            Alert.alert(t("general.error"), t("registro.error_username_corto"));
             return false;
         }
         if (/\s/.test(u)) {
-            Alert.alert("Error", "El username no puede contener espacios");
+            Alert.alert(t("general.error"), t("registro.error_username_espacios"));
             return false;
         }
         if (!validarEmail(email.trim())) {
-            Alert.alert("Error", "El email no tiene un formato válido");
+            Alert.alert(t("general.error"), t("registro.error_email"));
             return false;
         }
         if (password.length < 8) {
-            Alert.alert("Error", "La contraseña debe tener al menos 8 caracteres");
+            Alert.alert(t("general.error"), t("registro.error_password_corta"));
             return false;
         }
         if (password !== confirmarPassword) {
-            Alert.alert("Error", "Las contraseñas no coinciden");
+            Alert.alert(t("general.error"), t("registro.error_password_coincide"));
             return false;
         }
         return true;
@@ -137,11 +136,11 @@ export default function Registro() {
 
     const validarPaso2 = (): boolean => {
         if (!pais) {
-            Alert.alert("Error", "Debes seleccionar un país");
+            Alert.alert(t("general.error"), t("registro.error_pais"));
             return false;
         }
         if (ciudad.trim().length < 2) {
-            Alert.alert("Error", "Introduce tu ciudad");
+            Alert.alert(t("general.error"), t("registro.error_ciudad"));
             return false;
         }
         return true;
@@ -164,7 +163,7 @@ export default function Registro() {
                 ((hoy.getMonth() < nacimiento.getMonth() ||
                   (hoy.getMonth() === nacimiento.getMonth() && hoy.getDate() < nacimiento.getDate())) ? 1 : 0);
             if (edad < 18) {
-                Alert.alert("Edad no permitida", "Debes tener al menos 18 años para registrarte en BeerNow.");
+                Alert.alert(t("general.error"), t("registro.error_edad"));
                 return;
             }
         }
@@ -181,7 +180,7 @@ export default function Registro() {
             );
             router.replace("/(principal)/mapa");
         } catch (error: any) {
-            Alert.alert("Error", mensajeAmigable(error));
+            Alert.alert(t("general.error"), mensajeAmigable(error, t));
         } finally {
             setCargando(false);
         }
@@ -208,10 +207,8 @@ export default function Registro() {
                             style={styles.logo}
                             resizeMode="contain"
                         />
-                        <Text style={styles.titulo}>Crea tu cuenta</Text>
-                        <Text style={styles.subtitulo}>
-                            Únete a BeerMap y empieza a registrar tus cervezas
-                        </Text>
+                        <Text style={styles.titulo}>{t("registro.titulo")}</Text>
+                        <Text style={styles.subtitulo}>{t("registro.subtitulo")}</Text>
                     </View>
 
                     <View style={styles.pasos}>
@@ -225,19 +222,19 @@ export default function Registro() {
                             </View>
                         </View>
                         <View style={styles.filaEtiquetas}>
-                            <Text style={styles.etiquetaPaso}>Tu cuenta</Text>
-                            <Text style={styles.etiquetaPaso}>Tu perfil</Text>
+                            <Text style={styles.etiquetaPaso}>{t("registro.paso1_label")}</Text>
+                            <Text style={styles.etiquetaPaso}>{t("registro.paso2_label")}</Text>
                         </View>
                     </View>
 
                     <View style={styles.tarjeta}>
                         {paso === 1 ? (
                             <>
-                                <Campo label="Nombre de usuario">
+                                <Campo label={t("registro.username")}>
                                     <TextInput
                                         value={username}
                                         onChangeText={setUsername}
-                                        placeholder="ej: hopmaster99"
+                                        placeholder={t("registro.username_placeholder")}
                                         placeholderTextColor="#8A8A8A"
                                         autoCapitalize="none"
                                         autoCorrect={false}
@@ -246,11 +243,11 @@ export default function Registro() {
                                     />
                                 </Campo>
 
-                                <Campo label="Email">
+                                <Campo label={t("registro.email")}>
                                     <TextInput
                                         value={email}
                                         onChangeText={setEmail}
-                                        placeholder="tu@email.com"
+                                        placeholder={t("registro.email_placeholder")}
                                         placeholderTextColor="#8A8A8A"
                                         keyboardType="email-address"
                                         autoCapitalize="none"
@@ -259,12 +256,12 @@ export default function Registro() {
                                     />
                                 </Campo>
 
-                                <Campo label="Contraseña">
+                                <Campo label={t("registro.password")}>
                                     <View style={styles.inputConBoton}>
                                         <TextInput
                                             value={password}
                                             onChangeText={setPassword}
-                                            placeholder="Mínimo 8 caracteres"
+                                            placeholder={t("registro.password_placeholder")}
                                             placeholderTextColor="#8A8A8A"
                                             secureTextEntry={!mostrarPassword}
                                             autoCapitalize="none"
@@ -278,12 +275,12 @@ export default function Registro() {
                                     </View>
                                 </Campo>
 
-                                <Campo label="Confirmar contraseña">
+                                <Campo label={t("registro.confirmar_password")}>
                                     <View style={styles.inputConBoton}>
                                         <TextInput
                                             value={confirmarPassword}
                                             onChangeText={setConfirmarPassword}
-                                            placeholder="Repite la contraseña"
+                                            placeholder={t("registro.confirmar_placeholder")}
                                             placeholderTextColor="#8A8A8A"
                                             secureTextEntry={!mostrarConfirmar}
                                             autoCapitalize="none"
@@ -303,28 +300,28 @@ export default function Registro() {
                                     style={({ pressed }) => [styles.boton, pressed && styles.botonPulsado]}
                                     onPress={() => { if (validarPaso1()) setPaso(2); }}
                                 >
-                                    <Text style={styles.textoBoton}>Siguiente →</Text>
+                                    <Text style={styles.textoBoton}>{t("registro.siguiente")}</Text>
                                 </Pressable>
                             </>
                         ) : (
                             <>
-                                <Campo label="País *">
+                                <Campo label={t("registro.pais")}>
                                     <Pressable
                                         style={[styles.input, styles.selector]}
                                         onPress={() => setModalPais(true)}
                                     >
                                         <Text style={pais ? styles.selectorTexto : styles.selectorPlaceholder}>
-                                            {pais || "Selecciona tu país"}
+                                            {pais || t("registro.seleccionar_pais")}
                                         </Text>
                                         <Text style={styles.selectorChevron}>▾</Text>
                                     </Pressable>
                                 </Campo>
 
-                                <Campo label="Ciudad *">
+                                <Campo label={t("registro.ciudad")}>
                                     <TextInput
                                         value={ciudad}
                                         onChangeText={setCiudad}
-                                        placeholder="ej: Sevilla"
+                                        placeholder={t("registro.ciudad_placeholder")}
                                         placeholderTextColor="#8A8A8A"
                                         autoCorrect={false}
                                         maxLength={80}
@@ -334,18 +331,16 @@ export default function Registro() {
 
                                 {/* Aviso edad mínima obligatorio */}
                                 <View style={styles.avisoEdad}>
-                                    <Text style={styles.avisoEdadTexto}>
-                                        BeerNow es solo para mayores de 18 años
-                                    </Text>
+                                    <Text style={styles.avisoEdadTexto}>{t("registro.aviso_edad")}</Text>
                                 </View>
 
-                                <Campo label="Fecha de nacimiento (debes tener +18 años)">
+                                <Campo label={t("registro.fecha_nacimiento")}>
                                     <Pressable
                                         style={[styles.input, styles.selector]}
                                         onPress={() => setModalFecha(true)}
                                     >
                                         <Text style={fechaNacimiento ? styles.selectorTexto : styles.selectorPlaceholder}>
-                                            {fechaNacimiento ? formatearFechaVisible(fechaNacimiento) : "Selecciona tu fecha"}
+                                            {fechaNacimiento ? formatearFechaVisible(fechaNacimiento) : t("registro.seleccionar_pais")}
                                         </Text>
                                         <Text style={styles.selectorChevron}>▾</Text>
                                     </Pressable>
@@ -353,15 +348,13 @@ export default function Registro() {
 
                                 {/* Aviso legal obligatorio para stores */}
                                 <View style={styles.avisoLegal}>
-                                    <Text style={styles.avisoTexto}>
-                                        Al registrarte aceptas los{" "}
-                                    </Text>
+                                    <Text style={styles.avisoTexto}>{t("registro.terminos_texto")}{" "}</Text>
                                     <Pressable onPress={() => Linking.openURL("https://beer-now.com/terminos.html")}>
-                                        <Text style={[styles.avisoTexto, styles.avisoEnlace]}>Términos de uso</Text>
+                                        <Text style={[styles.avisoTexto, styles.avisoEnlace]}>{t("registro.terminos_enlace")}</Text>
                                     </Pressable>
-                                    <Text style={styles.avisoTexto}> y la </Text>
+                                    <Text style={styles.avisoTexto}> {t("registro.y_la")} </Text>
                                     <Pressable onPress={() => Linking.openURL("https://beer-now.com/privacidad.html")}>
-                                        <Text style={[styles.avisoTexto, styles.avisoEnlace]}>Política de privacidad</Text>
+                                        <Text style={[styles.avisoTexto, styles.avisoEnlace]}>{t("registro.privacidad_enlace")}</Text>
                                     </Pressable>
                                 </View>
 
@@ -371,7 +364,7 @@ export default function Registro() {
                                         onPress={() => setPaso(1)}
                                         disabled={cargando}
                                     >
-                                        <Text style={styles.textoBotonSecundario}>← Atrás</Text>
+                                        <Text style={styles.textoBotonSecundario}>←</Text>
                                     </Pressable>
 
                                     <Pressable
@@ -385,7 +378,7 @@ export default function Registro() {
                                     >
                                         {cargando
                                             ? <ActivityIndicator color="#FFFFFF" />
-                                            : <Text style={styles.textoBoton}>Crear cuenta 🍺</Text>
+                                            : <Text style={styles.textoBoton}>{t("registro.crear")} 🍺</Text>
                                         }
                                     </Pressable>
                                 </View>
@@ -394,10 +387,10 @@ export default function Registro() {
                     </View>
 
                     <View style={styles.bloqueLogin}>
-                        <Text style={styles.textoSecundario}>¿Ya tienes cuenta? </Text>
+                        <Text style={styles.textoSecundario}>{t("registro.ya_cuenta")} </Text>
                         <Link href="/login" asChild>
                             <Pressable>
-                                <Text style={styles.enlace}>Inicia sesión</Text>
+                                <Text style={styles.enlace}>{t("registro.iniciar")}</Text>
                             </Pressable>
                         </Link>
                     </View>
@@ -415,7 +408,7 @@ export default function Registro() {
                     <View style={styles.modalOverlay}>
                         <View style={styles.modalContenedor}>
                             <View style={styles.modalCabecera}>
-                                <Text style={styles.modalTitulo}>Selecciona tu país</Text>
+                                <Text style={styles.modalTitulo}>{t("registro.seleccionar_pais")}</Text>
                                 <Pressable onPress={() => { setModalPais(false); setBusquedaPais(""); }}>
                                     <Text style={styles.modalCerrar}>✕</Text>
                                 </Pressable>
@@ -423,7 +416,7 @@ export default function Registro() {
                             <TextInput
                                 value={busquedaPais}
                                 onChangeText={setBusquedaPais}
-                                placeholder="Buscar país..."
+                                placeholder={t("registro.buscar_pais")}
                                 placeholderTextColor="#8A8A8A"
                                 style={styles.busquedaInput}
                                 autoFocus
@@ -463,7 +456,7 @@ export default function Registro() {
                 <View style={styles.modalOverlay}>
                     <View style={[styles.modalContenedor, styles.modalFechaContenedor]}>
                         <View style={styles.modalCabecera}>
-                            <Text style={styles.modalTitulo}>Fecha de nacimiento</Text>
+                            <Text style={styles.modalTitulo}>{t("registro.fecha_nacimiento_modal")}</Text>
                             <Pressable onPress={() => setModalFecha(false)}>
                                 <Text style={styles.modalCerrar}>✕</Text>
                             </Pressable>
@@ -471,7 +464,7 @@ export default function Registro() {
 
                         <View style={styles.fechaFila}>
                             <View style={styles.fechaColumna}>
-                                <Text style={styles.fechaEtiqueta}>Día</Text>
+                                <Text style={styles.fechaEtiqueta}>{t("registro.dia")}</Text>
                                 <ScrollView style={styles.fechaScroll} showsVerticalScrollIndicator={false}>
                                     {Array.from({ length: 31 }, (_, i) => i + 1).map(d => (
                                         <Pressable
@@ -488,9 +481,9 @@ export default function Registro() {
                             </View>
 
                             <View style={styles.fechaColumna}>
-                                <Text style={styles.fechaEtiqueta}>Mes</Text>
+                                <Text style={styles.fechaEtiqueta}>{t("registro.mes_label")}</Text>
                                 <ScrollView style={styles.fechaScroll} showsVerticalScrollIndicator={false}>
-                                    {["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"].map((m, i) => (
+                                    {t("registro.meses").split(",").map((m, i) => (
                                         <Pressable
                                             key={m}
                                             style={[styles.fechaItem, fechaTemporal.mes === i + 1 && styles.fechaItemActivo]}
@@ -505,7 +498,7 @@ export default function Registro() {
                             </View>
 
                             <View style={styles.fechaColumna}>
-                                <Text style={styles.fechaEtiqueta}>Año</Text>
+                                <Text style={styles.fechaEtiqueta}>{t("registro.anio")}</Text>
                                 <ScrollView style={styles.fechaScroll} showsVerticalScrollIndicator={false}>
                                     {Array.from({ length: 100 }, (_, i) => new Date().getFullYear() - 10 - i).map(a => (
                                         <Pressable
@@ -523,7 +516,7 @@ export default function Registro() {
                         </View>
 
                         <Pressable style={[styles.boton, { marginTop: 16 }]} onPress={confirmarFecha}>
-                            <Text style={styles.textoBoton}>Confirmar fecha</Text>
+                            <Text style={styles.textoBoton}>{t("registro.confirmar_fecha")}</Text>
                         </Pressable>
                     </View>
                 </View>
@@ -544,6 +537,7 @@ function Campo({ label, children }: { label: string; children: React.ReactNode }
 }
 
 function FuerzaPassword({ password }: { password: string }) {
+    const t = useT();
     const calcular = () => {
         let p = 0;
         if (password.length >= 8) p++;
@@ -551,9 +545,9 @@ function FuerzaPassword({ password }: { password: string }) {
         if (/[A-Z]/.test(password)) p++;
         if (/[0-9]/.test(password)) p++;
         if (/[^A-Za-z0-9]/.test(password)) p++;
-        if (p <= 1) return { nivel: 1, texto: "Débil", color: "#E53E3E" };
-        if (p <= 3) return { nivel: 2, texto: "Media", color: "#D69E2E" };
-        return { nivel: 3, texto: "Fuerte", color: "#38A169" };
+        if (p <= 1) return { nivel: 1, texto: t("registro.fuerza_debil"), color: "#E53E3E" };
+        if (p <= 3) return { nivel: 2, texto: t("registro.fuerza_media"), color: "#D69E2E" };
+        return { nivel: 3, texto: t("registro.fuerza_fuerte"), color: "#38A169" };
     };
     const { nivel, texto, color } = calcular();
     return (

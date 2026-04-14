@@ -21,6 +21,7 @@ import { useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { usarAuth } from "../../contexto/ContextoAuth";
 import { hacerPeticion } from "../../servicios/api";
+import { useT } from "../../i18n";
 import { obtenerMisRachas } from "../../servicios/servicioAuth";
 import { obtenerMisIconos } from "../../servicios/servicioIconos";
 import { AvatarCirculo } from "../../componentes/AvatarCirculo";
@@ -53,15 +54,15 @@ type IconoDisponible = {
  * Convierte errores técnicos de la API en mensajes comprensibles para el usuario.
  * Compara el texto del error con patrones conocidos y devuelve el texto amigable.
  */
-function mensajeAmigable(e: any): string {
+function mensajeAmigable(e: any, t: (key: string) => string): string {
     const raw = (e?.message ?? "").toLowerCase();
     if (raw.includes("network request failed") || raw.includes("failed to fetch") || raw.includes("network error")) {
-        return "Sin conexión. Comprueba tu internet";
+        return t("mapa.error_red");
     }
     if (raw.includes("esperar") || raw.includes("cooldown") || raw.includes("check-in")) {
-        return "Espera 5 minutos entre cervezas 🍺";
+        return t("mapa.error_cooldown");
     }
-    return e?.message || "Algo ha ido mal. Inténtalo de nuevo";
+    return e?.message || t("mapa.error_generico");
 }
 
 // ─── Estilo mapa mudo ─────────────────────────────────────────────────────────
@@ -85,6 +86,7 @@ const MAPA_ESTILO = [
 
 export default function Mapa() {
     const { token, usuario } = usarAuth();
+    const t = useT();
     const [checkins, setCheckins] = useState<CheckinMapa[]>([]);
     const [cargando, setCargando] = useState(true);
     const [modalCheckin, setModalCheckin] = useState(false);
@@ -139,7 +141,7 @@ export default function Mapa() {
             // mostramos el mapa vacío para que el botón "Registrar cerveza" siga funcionando.
             const esAuth = (e?.message ?? "").toLowerCase().includes("sesión expirada");
             if (esAuth) {
-                Alert.alert("Sesión expirada", "Inicia sesión de nuevo");
+                Alert.alert(t("mapa.error_sesion"), t("mapa.error_sesion_sub"));
             } else {
                 // Cargamos lista vacía silenciosamente; el usuario puede registrar igualmente
                 setCheckins([]);
@@ -175,9 +177,9 @@ export default function Mapa() {
                     <View>
                         <Text style={s.headerNombre}>{usuario?.username}</Text>
                         {rachaActual >= 3 ? (
-                            <Text style={s.headerSub}>🔥 {rachaActual} días de racha</Text>
+                            <Text style={s.headerSub}>🔥 {rachaActual} {t("mapa.dias_racha")}</Text>
                         ) : (
-                            <Text style={s.headerSub}>Tu mapa de cervezas</Text>
+                            <Text style={s.headerSub}>{t("mapa.titulo")}</Text>
                         )}
                     </View>
                 </View>
@@ -191,19 +193,19 @@ export default function Mapa() {
             <View style={s.statsRow}>
                 <View style={s.statItem}>
                     <Text style={s.statNum}>{checkins.length}</Text>
-                    <Text style={s.statLabel}>cervezas</Text>
+                    <Text style={s.statLabel}>{t("mapa.cervezas")}</Text>
                 </View>
                 <View style={s.statDivider} />
                 <View style={s.statItem}>
                     <Text style={s.statNum}>{totalGastado.toFixed(2)}<Text style={s.statNumSuffix}>€</Text></Text>
-                    <Text style={s.statLabel}>gastado</Text>
+                    <Text style={s.statLabel}>{t("mapa.gastado")}</Text>
                 </View>
                 <View style={s.statDivider} />
                 <View style={s.statItem}>
                     <Text style={s.statNum}>
                         {new Set(checkins.map(c => `${Number(c.lat).toFixed(2)},${Number(c.lng).toFixed(2)}`)).size}
                     </Text>
-                    <Text style={s.statLabel}>lugares</Text>
+                    <Text style={s.statLabel}>{t("mapa.lugares")}</Text>
                 </View>
             </View>
 
@@ -256,7 +258,7 @@ export default function Mapa() {
                         style={({ pressed }) => [s.btnRegistrar, pressed && s.btnPressed]}
                         onPress={() => setModalCheckin(true)}
                     >
-                        <Text style={s.btnRegistrarTexto}>Registrar cerveza</Text>
+                        <Text style={s.btnRegistrarTexto}>{t("mapa.registrar")}</Text>
                     </Pressable>
                 </View>
             )}
@@ -285,6 +287,7 @@ function ModalCheckin({ visible, token, onCerrar, onExito }: {
     onCerrar: () => void;
     onExito: () => void;
 }) {
+    const t = useT();
     const [precio, setPrecio] = useState("");
     const [nota, setNota] = useState("");
     const [misIconos, setMisIconos] = useState<IconoDisponible[]>([]);
@@ -316,17 +319,16 @@ function ModalCheckin({ visible, token, onCerrar, onExito }: {
         if (!token) return;
         setEnviando(true);
         try {
-            setFaseEnvio("Obteniendo ubicación...");
+            setFaseEnvio(t("mapa.obteniendo_ubicacion"));
             const { status } = await Location.requestForegroundPermissionsAsync();
             if (status !== "granted") {
-                // Mensaje motivador en vez del técnico "Permiso denegado"
-                Alert.alert("GPS desactivado", "Activa el GPS para registrar tu cerveza");
+                Alert.alert(t("mapa.error_gps"), t("mapa.error_gps_sub"));
                 setEnviando(false);
                 return;
             }
             const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
 
-            setFaseEnvio("Registrando...");
+            setFaseEnvio(t("mapa.registrando"));
             const body: any = {
                 lat: loc.coords.latitude,
                 lng: loc.coords.longitude,
@@ -335,7 +337,7 @@ function ModalCheckin({ visible, token, onCerrar, onExito }: {
             if (precio.trim()) {
                 const n = parseFloat(precio.replace(",", "."));
                 if (isNaN(n) || n < 0) {
-                    Alert.alert("Error", "Precio no válido");
+                    Alert.alert(t("general.error"), t("mapa.error_precio"));
                     setEnviando(false);
                     return;
                 }
@@ -361,8 +363,7 @@ function ModalCheckin({ visible, token, onCerrar, onExito }: {
             setIconoSeleccionado(activo ? activo.id : (misIconos[0]?.id ?? null));
             onExito();
         } catch (e: any) {
-            // Mostramos el detalle exacto del backend para poder diagnosticar
-            Alert.alert("Error al registrar", `${mensajeAmigable(e)}\n\nIntenta de nuevo`);
+            Alert.alert(t("mapa.error_registrar"), mensajeAmigable(e, t));
         } finally {
             setEnviando(false);
             setFaseEnvio("");
@@ -381,7 +382,7 @@ function ModalCheckin({ visible, token, onCerrar, onExito }: {
                         <View style={s.handle} />
 
                         <View style={s.sheetHeader}>
-                            <Text style={s.sheetTitulo}>Nueva cerveza</Text>
+                            <Text style={s.sheetTitulo}>{t("mapa.nueva_cerveza")}</Text>
                             <Pressable onPress={onCerrar} disabled={enviando} style={s.closeBtn}>
                                 <Ionicons name="close" size={20} color="#4E5968" />
                             </Pressable>
@@ -394,7 +395,7 @@ function ModalCheckin({ visible, token, onCerrar, onExito }: {
                             {/* Selector de icono — cargado desde el backend */}
                             {misIconos.length > 0 && (
                                 <>
-                                    <Text style={s.fieldLabel}>Elige tu icono</Text>
+                                    <Text style={s.fieldLabel}>{t("mapa.icono")}</Text>
                                     <View style={s.iconosRow}>
                                         {misIconos.map(ic => (
                                             <Pressable
@@ -413,7 +414,7 @@ function ModalCheckin({ visible, token, onCerrar, onExito }: {
                             )}
 
                             {/* Precio */}
-                            <Text style={s.fieldLabel}>Precio (opcional)</Text>
+                            <Text style={s.fieldLabel}>{t("mapa.precio")}</Text>
                             <View style={s.precioRow}>
                                 <TextInput
                                     value={precio}
@@ -427,11 +428,11 @@ function ModalCheckin({ visible, token, onCerrar, onExito }: {
                             </View>
 
                             {/* Nota */}
-                            <Text style={s.fieldLabel}>Nota (opcional)</Text>
+                            <Text style={s.fieldLabel}>{t("mapa.nota")}</Text>
                             <TextInput
                                 value={nota}
                                 onChangeText={setNota}
-                                placeholder="¿Qué cerveza es?"
+                                placeholder={t("mapa.nota_placeholder")}
                                 placeholderTextColor="#B0BAC8"
                                 maxLength={180}
                                 multiline
@@ -448,7 +449,7 @@ function ModalCheckin({ visible, token, onCerrar, onExito }: {
                                         <ActivityIndicator color="#fff" size="small" />
                                         <Text style={s.btnLabel}>{faseEnvio}</Text>
                                       </View>
-                                    : <Text style={s.btnLabel}>Registrar</Text>
+                                    : <Text style={s.btnLabel}>{t("mapa.boton_registrar")}</Text>
                                 }
                             </Pressable>
                         </ScrollView>
@@ -472,6 +473,7 @@ function ModalDetalle({
     checkin: CheckinMapa | null;
     onCerrar: () => void;
 }) {
+    const t = useT();
     if (!checkin) return null;
 
     const tieneFoto   = !!checkin.foto_url;
@@ -492,7 +494,7 @@ function ModalDetalle({
                     <View style={s.handle} />
 
                     <View style={s.sheetHeader}>
-                        <Text style={s.sheetTitulo}>🍺 Detalle</Text>
+                        <Text style={s.sheetTitulo}>🍺 {t("mapa.detalle")}</Text>
                         <Pressable onPress={onCerrar} style={s.closeBtn}>
                             <Ionicons name="close" size={20} color="#4E5968" />
                         </Pressable>
@@ -526,7 +528,7 @@ function ModalDetalle({
 
                     {/* Mensaje cuando no hay info extra */}
                     {!tieneFoto && !tienePrecio && !tieneNota && (
-                        <Text style={s.detalleSinInfo}>Sin información adicional</Text>
+                        <Text style={s.detalleSinInfo}>{t("mapa.sin_info")}</Text>
                     )}
                 </Pressable>
             </Pressable>

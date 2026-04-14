@@ -18,26 +18,25 @@ import * as WebBrowser from "expo-web-browser";
 import * as Google from "expo-auth-session/providers/google";
 import { Ionicons } from "@expo/vector-icons";
 import { usarAuth } from "../contexto/ContextoAuth";
+import { useT } from "../i18n";
 
 // Necesario para que el navegador de OAuth cierre correctamente
 WebBrowser.maybeCompleteAuthSession();
 
-/*
- * Traduce errores técnicos de la API a mensajes en español natural.
- */
-function mensajeAmigable(e: any): string {
+function mensajeAmigable(e: any, t: (key: string) => string): string {
     const raw = (e?.message ?? "").toLowerCase();
     if (raw.includes("network request failed") || raw.includes("failed to fetch") || raw.includes("network error")) {
-        return "Sin conexión. Comprueba tu internet";
+        return t("login.error_red");
     }
     if (raw.includes("credencial") || raw.includes("inválid") || raw.includes("invalid") || raw.includes("incorrect")) {
-        return "Email o contraseña incorrectos";
+        return t("login.error_credenciales");
     }
-    return e?.message || "No se ha podido iniciar sesión";
+    return e?.message || t("login.error_generico");
 }
 
 export default function Login() {
     const router = useRouter();
+    const t = useT();
     const { iniciarSesion, iniciarSesionConGoogle } = usarAuth();
 
     const [email, setEmail] = useState("");
@@ -58,7 +57,7 @@ export default function Login() {
 
         const idToken = response.params?.id_token;
         if (!idToken) {
-            Alert.alert("Error", "No se recibió el token de Google");
+            Alert.alert(t("general.error"), t("login.error_google"));
             return;
         }
 
@@ -68,7 +67,7 @@ export default function Login() {
                 await iniciarSesionConGoogle(idToken);
                 router.replace("/(principal)/mapa");
             } catch (error: any) {
-                Alert.alert("Error", mensajeAmigable(error));
+                Alert.alert(t("general.error"), mensajeAmigable(error, t));
             } finally {
                 setCargandoGoogle(false);
             }
@@ -80,7 +79,7 @@ export default function Login() {
         const passwordLimpia = password.trim();
 
         if (emailLimpio === "" || passwordLimpia === "") {
-            Alert.alert("Error", "Debes completar email y contraseña");
+            Alert.alert(t("general.error"), t("login.error_campos"));
             return;
         }
 
@@ -89,7 +88,7 @@ export default function Login() {
             await iniciarSesion(emailLimpio, passwordLimpia);
             router.replace("/mapa" as never);
         } catch (error: any) {
-            Alert.alert("Error", mensajeAmigable(error));
+            Alert.alert(t("general.error"), mensajeAmigable(error, t));
         } finally {
             setCargando(false);
         }
@@ -120,20 +119,18 @@ export default function Login() {
                             resizeMode="contain"
                         />
 
-                        <Text style={styles.titulo}>Inicia sesión</Text>
+                        <Text style={styles.titulo}>{t("login.titulo")}</Text>
 
-                        <Text style={styles.subtitulo}>
-                            Tu mapa de cervezas te espera 🍺
-                        </Text>
+                        <Text style={styles.subtitulo}>{t("login.subtitulo")}</Text>
                     </View>
 
                     <View style={styles.tarjeta}>
                         <View style={styles.bloqueCampo}>
-                            <Text style={styles.label}>Email</Text>
+                            <Text style={styles.label}>{t("login.email")}</Text>
                             <TextInput
                                 value={email}
                                 onChangeText={setEmail}
-                                placeholder="Introduce tu email"
+                                placeholder={t("login.email_placeholder")}
                                 placeholderTextColor="#8A8A8A"
                                 keyboardType="email-address"
                                 autoCapitalize="none"
@@ -143,13 +140,13 @@ export default function Login() {
                         </View>
 
                         <View style={styles.bloqueCampo}>
-                            <Text style={styles.label}>Contraseña</Text>
+                            <Text style={styles.label}>{t("login.password")}</Text>
                             {/* Wrapper relativo para posicionar el ojo sobre el input */}
                             <View style={styles.inputConBoton}>
                                 <TextInput
                                     value={password}
                                     onChangeText={setPassword}
-                                    placeholder="Introduce tu contraseña"
+                                    placeholder={t("login.password_placeholder")}
                                     placeholderTextColor="#8A8A8A"
                                     secureTextEntry={!mostrarPassword}
                                     autoCapitalize="none"
@@ -175,7 +172,7 @@ export default function Login() {
                             style={styles.olvidaste}
                             onPress={() => router.push("/recuperar-password" as never)}
                         >
-                            <Text style={styles.olvidasteTexto}>¿Olvidaste tu contraseña?</Text>
+                            <Text style={styles.olvidasteTexto}>{t("login.olvidaste")}</Text>
                         </Pressable>
 
                         <Pressable
@@ -190,7 +187,7 @@ export default function Login() {
                             {cargando ? (
                                 <ActivityIndicator color="#FFFFFF" />
                             ) : (
-                                <Text style={styles.textoBoton}>Entrar</Text>
+                                <Text style={styles.textoBoton}>{t("login.entrar")}</Text>
                             )}
                         </Pressable>
 
@@ -224,18 +221,16 @@ export default function Login() {
                                         <Text style={{ color: "#34A853" }}>l</Text>
                                         <Text style={{ color: "#EA4335" }}>e</Text>
                                     </Text>
-                                    <Text style={styles.textoBotonGoogle}>Continuar con Google</Text>
+                                    <Text style={styles.textoBotonGoogle}>{t("login.continuar_google")}</Text>
                                 </>
                             )}
                         </Pressable>
 
                         <View style={styles.bloqueRegistro}>
-                            <Text style={styles.textoSecundario}>
-                                ¿No tienes cuenta?
-                            </Text>
+                            <Text style={styles.textoSecundario}>{t("login.no_cuenta")} </Text>
                             <Link href="/registro" asChild>
                                 <Pressable>
-                                    <Text style={styles.enlace}>Crear cuenta</Text>
+                                    <Text style={styles.enlace}>{t("login.crear_cuenta")}</Text>
                                 </Pressable>
                             </Link>
                         </View>

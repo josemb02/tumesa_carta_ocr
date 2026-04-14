@@ -23,6 +23,7 @@ import { usarAuth } from "../../contexto/ContextoAuth";
 import { obtenerMisStats, obtenerMisRachas, cambiarContrasena } from "../../servicios/servicioAuth";
 import { hacerPeticion } from "../../servicios/api";
 import { AvatarCirculo } from "../../componentes/AvatarCirculo";
+import { useT, cambiarIdioma, obtenerIdioma } from "../../i18n";
 
 /*
  * Cloud name de Cloudinary y preset sin firma configurados en el panel.
@@ -101,6 +102,7 @@ type Rachas = {
 export default function Perfil() {
     const { usuario, cerrarSesion, token, guardarAvatar, actualizarUsuario } = usarAuth();
     const router = useRouter();
+    const t = useT();
     const [cerrando, setCerrando] = useState(false);
     const [subiendo, setSubiendo] = useState(false);
     const [stats, setStats]     = useState<Stats | null>(null);
@@ -171,7 +173,7 @@ export default function Perfil() {
         // Pedimos permiso de acceso a la galería
         const permiso = await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (!permiso.granted) {
-            Alert.alert("Permiso denegado", "Necesitamos acceso a tus fotos para cambiar el avatar.");
+            Alert.alert(t("general.error"), t("perfil.error_permiso_foto"));
             return;
         }
 
@@ -189,7 +191,7 @@ export default function Perfil() {
             const url = await subirACloudinary(resultado.assets[0].uri);
             await guardarAvatar(url);
         } catch (err: any) {
-            Alert.alert("Error", err?.message || "No se pudo actualizar la foto.");
+            Alert.alert(t("general.error"), err?.message || t("perfil.error_foto"));
         } finally {
             setSubiendo(false);
         }
@@ -197,25 +199,25 @@ export default function Perfil() {
 
     async function handleCambiarPassword() {
         if (!passNueva || !passActual) {
-            Alert.alert("Error", "Rellena todos los campos.");
+            Alert.alert(t("general.error"), t("perfil.error_campos"));
             return;
         }
         if (passNueva !== passConfirmar) {
-            Alert.alert("Error", "Las contraseñas nuevas no coinciden.");
+            Alert.alert(t("general.error"), t("perfil.error_password_coincide"));
             return;
         }
         if (passNueva.length < 8) {
-            Alert.alert("Error", "La nueva contraseña debe tener al menos 8 caracteres.");
+            Alert.alert(t("general.error"), t("perfil.error_password_corta"));
             return;
         }
         try {
             setCambiandoPass(true);
             await cambiarContrasena(token!, passActual, passNueva);
-            Alert.alert("Listo", "Contraseña actualizada correctamente.");
+            Alert.alert("✓", t("perfil.exito_password"));
             setModalPassword(false);
             setPassActual(""); setPassNueva(""); setPassConfirmar("");
         } catch (err: any) {
-            Alert.alert("Error", err?.message || "No se pudo cambiar la contraseña.");
+            Alert.alert(t("general.error"), err?.message || t("perfil.error_password"));
         } finally {
             setCambiandoPass(false);
         }
@@ -227,11 +229,11 @@ export default function Perfil() {
         const p = editPais.trim();
         const c = editCiudad.trim();
         if (u.length < 3) {
-            Alert.alert("Error", "El nombre de usuario debe tener al menos 3 caracteres");
+            Alert.alert(t("general.error"), t("perfil.error_username_corto"));
             return;
         }
         if (p.length < 2 || c.length < 2) {
-            Alert.alert("Error", "País y ciudad son obligatorios");
+            Alert.alert(t("general.error"), t("perfil.error_pais_ciudad"));
             return;
         }
         try {
@@ -242,12 +244,11 @@ export default function Perfil() {
                 body: { username: u, pais: p, ciudad: c },
             });
             setModalEditar(false);
-            // Actualizar el contexto para reflejar los cambios en toda la app inmediatamente
             actualizarUsuario({ username: u, pais: p, ciudad: c });
-            Alert.alert("✓ Guardado", "Perfil actualizado correctamente");
+            Alert.alert("✓", t("perfil.exito_perfil"));
             await cargarTodo();
         } catch (err: any) {
-            Alert.alert("Error", err?.message || "No se pudo actualizar el perfil");
+            Alert.alert(t("general.error"), err?.message || t("perfil.error_perfil"));
         } finally {
             setGuardandoPerfil(false);
         }
@@ -255,27 +256,23 @@ export default function Perfil() {
 
     async function handleEliminarCuenta() {
         Alert.alert(
-            "Eliminar cuenta",
-            "Esta acción es permanente. Se borrarán todos tus datos, check-ins y puntos. ¿Estás seguro?",
+            t("perfil.eliminar_titulo"),
+            t("perfil.eliminar_sub"),
             [
-                { text: "Cancelar", style: "cancel" },
+                { text: t("general.cancelar"), style: "cancel" },
                 {
-                    text: "Eliminar para siempre",
+                    text: t("perfil.eliminar_confirmar"),
                     style: "destructive",
                     onPress: async () => {
                         try {
-                            // Primero cerrar sesión localmente para limpiar tokens
-                            // antes de llamar al backend, así evitamos el error
-                            // de token inválido al intentar refrescar después
                             await cerrarSesion();
-                            // Luego intentar eliminar en el backend (best effort)
                             try {
                                 await hacerPeticion("/auth/me", { metodo: "DELETE", token });
                             } catch {
                                 // Si falla el backend no importa — ya cerramos sesión local
                             }
                         } catch (err: any) {
-                            Alert.alert("Error", err?.message || "No se pudo eliminar la cuenta");
+                            Alert.alert(t("general.error"), err?.message || t("perfil.error_eliminar"));
                         }
                     },
                 },
@@ -284,10 +281,10 @@ export default function Perfil() {
     }
 
     async function handleCerrarSesion() {
-        Alert.alert("Cerrar sesión", "¿Seguro que quieres salir?", [
-            { text: "Cancelar", style: "cancel" },
+        Alert.alert(t("perfil.cerrar_sesion_titulo"), t("perfil.cerrar_sesion_sub"), [
+            { text: t("general.cancelar"), style: "cancel" },
             {
-                text: "Salir", style: "destructive",
+                text: t("perfil.cerrar_sesion_confirmar"), style: "destructive",
                 onPress: async () => {
                     try {
                         setCerrando(true);
@@ -373,30 +370,30 @@ export default function Perfil() {
                     </View>
                 ) : stats && (
                     <View style={s.statsRow}>
-                        <StatItem valor={stats.total_checkins.toString()} label="cervezas" />
+                        <StatItem valor={stats.total_checkins.toString()} label={t("perfil.cervezas")} />
                         <View style={s.statsDivider} />
-                        <StatItem valor={`${stats.total_gastado.toFixed(0)}€`} label="gastado" />
+                        <StatItem valor={`${stats.total_gastado.toFixed(0)}€`} label={t("perfil.gastado")} />
                         <View style={s.statsDivider} />
-                        <StatItem valor={stats.total_puntos.toString()} label="puntos" />
+                        <StatItem valor={stats.total_puntos.toString()} label={t("perfil.puntos")} />
                         <View style={s.statsDivider} />
-                        <StatItem valor={stats.total_grupos.toString()} label="grupos" />
+                        <StatItem valor={stats.total_grupos.toString()} label={t("perfil.grupos")} />
                     </View>
                 )}
 
                 {/* Actividad reciente */}
                 {!cargando && stats && (
                     <>
-                        <Text style={s.seccionLabel}>Actividad</Text>
+                        <Text style={s.seccionLabel}>{t("perfil.actividad")}</Text>
                         <View style={s.card}>
                             <FilaInfo
                                 icono="calendar-outline"
-                                label="Esta semana"
+                                label={t("perfil.esta_semana")}
                                 valor={`${stats.checkins_esta_semana} check-in${stats.checkins_esta_semana !== 1 ? "s" : ""}`}
                             />
                             <View style={s.cardSep} />
                             <FilaInfo
                                 icono="stats-chart-outline"
-                                label="Este mes"
+                                label={t("perfil.este_mes")}
                                 valor={`${stats.checkins_este_mes} check-in${stats.checkins_este_mes !== 1 ? "s" : ""}`}
                             />
                             {stats.ultimo_checkin && (
@@ -404,7 +401,7 @@ export default function Perfil() {
                                     <View style={s.cardSep} />
                                     <FilaInfo
                                         icono="time-outline"
-                                        label="Último"
+                                        label={t("perfil.ultimo_checkin")}
                                         valor={formatearFecha(stats.ultimo_checkin)}
                                     />
                                 </>
@@ -414,13 +411,13 @@ export default function Perfil() {
                                     <View style={s.cardSep} />
                                     <FilaInfo
                                         icono="flame-outline"
-                                        label="Racha actual"
+                                        label={t("perfil.racha_actual")}
                                         valor={`${rachas.racha_actual} día${rachas.racha_actual !== 1 ? "s" : ""}`}
                                     />
                                     <View style={s.cardSep} />
                                     <FilaInfo
                                         icono="trophy-outline"
-                                        label="Racha máxima"
+                                        label={t("perfil.racha_maxima")}
                                         valor={`${rachas.racha_maxima} día${rachas.racha_maxima !== 1 ? "s" : ""}`}
                                     />
                                 </>
@@ -432,7 +429,7 @@ export default function Perfil() {
                 {/* Insignias — siempre visibles aunque no haya ninguna ganada */}
                 {!cargando && stats && (
                     <>
-                        <Text style={s.seccionLabel}>Logros</Text>
+                        <Text style={s.seccionLabel}>{t("perfil.logros")}</Text>
                         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.insigniasScroll}>
                             {insignias.map(ins => (
                                 <View key={ins.id} style={s.insignia}>
@@ -452,14 +449,14 @@ export default function Perfil() {
                 )}
 
                 {/* Info cuenta */}
-                <Text style={s.seccionLabel}>Cuenta</Text>
+                <Text style={s.seccionLabel}>{t("perfil.cuenta")}</Text>
                 <View style={s.card}>
-                    <FilaInfo icono="person-outline" label="Usuario" valor={usuario.username} />
+                    <FilaInfo icono="person-outline" label={t("perfil.usuario_label")} valor={usuario.username} />
                     <View style={s.cardSep} />
-                    <FilaInfo icono="mail-outline" label="Email" valor={usuario.email} />
+                    <FilaInfo icono="mail-outline" label={t("perfil.email_label")} valor={usuario.email} />
                     {usuario.role && <>
                         <View style={s.cardSep} />
-                        <FilaInfo icono="shield-checkmark-outline" label="Rol" valor={usuario.role} />
+                        <FilaInfo icono="shield-checkmark-outline" label={t("perfil.rol_label")} valor={usuario.role} />
                     </>}
                     <View style={s.cardSep} />
                     <Pressable
@@ -469,19 +466,40 @@ export default function Perfil() {
                         <View style={s.filaIcono}>
                             <Ionicons name="lock-closed-outline" size={16} color="#6B85A8" />
                         </View>
-                        <Text style={[s.filaLabel, { flex: 1 }]}>Cambiar contraseña</Text>
+                        <Text style={[s.filaLabel, { flex: 1 }]}>{t("perfil.cambiar_password")}</Text>
                         <Ionicons name="chevron-forward" size={16} color="#C0BAB0" />
                     </Pressable>
+                    <View style={s.cardSep} />
+                    <View style={s.filaInfo}>
+                        <View style={s.filaIcono}>
+                            <Ionicons name="language-outline" size={16} color="#6B85A8" />
+                        </View>
+                        <Text style={[s.filaLabel, { flex: 1 }]}>{t("perfil.idioma")}</Text>
+                        <View style={s.idiomaOpciones}>
+                            <Pressable
+                                style={[s.idiomaBtn, obtenerIdioma() === "es" && s.idiomaBtnActivo]}
+                                onPress={() => cambiarIdioma("es")}
+                            >
+                                <Text style={[s.idiomaBtnTexto, obtenerIdioma() === "es" && s.idiomaBtnTextoActivo]}>ES</Text>
+                            </Pressable>
+                            <Pressable
+                                style={[s.idiomaBtn, obtenerIdioma() === "en" && s.idiomaBtnActivo]}
+                                onPress={() => cambiarIdioma("en")}
+                            >
+                                <Text style={[s.idiomaBtnTexto, obtenerIdioma() === "en" && s.idiomaBtnTextoActivo]}>EN</Text>
+                            </Pressable>
+                        </View>
+                    </View>
                 </View>
 
                 {/* Info ubicación */}
                 {(usuario.pais || usuario.ciudad) && (
                     <>
-                        <Text style={s.seccionLabel}>Ubicación</Text>
+                        <Text style={s.seccionLabel}>{t("perfil.ubicacion")}</Text>
                         <View style={s.card}>
-                            {usuario.pais && <FilaInfo icono="earth-outline" label="País" valor={usuario.pais} />}
+                            {usuario.pais && <FilaInfo icono="earth-outline" label={t("perfil.pais_label")} valor={usuario.pais} />}
                             {usuario.ciudad && usuario.pais && <View style={s.cardSep} />}
-                            {usuario.ciudad && <FilaInfo icono="business-outline" label="Ciudad" valor={usuario.ciudad} />}
+                            {usuario.ciudad && <FilaInfo icono="business-outline" label={t("perfil.ciudad_label")} valor={usuario.ciudad} />}
                         </View>
                     </>
                 )}
@@ -489,13 +507,13 @@ export default function Perfil() {
                 {/* Historial de check-ins */}
                 {historial.length > 0 && (
                     <View style={s.seccionCard}>
-                        <Text style={s.seccionTitulo}>Últimos check-ins</Text>
+                        <Text style={s.seccionTitulo}>{t("perfil.ultimos_checkins")}</Text>
                         {historial.slice(0, 5).map((c) => (
                             <View key={c.id} style={s.historialFila}>
                                 <Text style={s.historialEmoji}>{c.icon_emoji || "🍺"}</Text>
                                 <View style={s.historialInfo}>
                                     <Text style={s.historialNota} numberOfLines={1}>
-                                        {c.note || "Sin nota"}
+                                        {c.note || t("perfil.sin_nota")}
                                     </Text>
                                     <Text style={s.historialFecha}>
                                         {new Date(c.created_at).toLocaleDateString("es-ES")}
@@ -521,7 +539,7 @@ export default function Perfil() {
                     }}
                 >
                     <Ionicons name="create-outline" size={18} color="#10233E" />
-                    <Text style={s.botonSecundarioTexto}>Editar perfil</Text>
+                    <Text style={s.botonSecundarioTexto}>{t("perfil.editar_perfil")}</Text>
                 </Pressable>
 
                 {/* Botón eliminar cuenta */}
@@ -530,7 +548,7 @@ export default function Perfil() {
                     onPress={handleEliminarCuenta}
                 >
                     <Ionicons name="trash-outline" size={18} color="#C0392B" />
-                    <Text style={s.botonPeligroTexto}>Eliminar cuenta</Text>
+                    <Text style={s.botonPeligroTexto}>{t("perfil.eliminar_cuenta")}</Text>
                 </Pressable>
 
                 {/* Cerrar sesión */}
@@ -543,7 +561,7 @@ export default function Perfil() {
                         ? <ActivityIndicator color="#E53E3E" size="small" />
                         : <>
                             <Ionicons name="log-out-outline" size={18} color="#E53E3E" />
-                            <Text style={s.btnSalirTexto}>Cerrar sesión</Text>
+                            <Text style={s.btnSalirTexto}>{t("perfil.cerrar_sesion")}</Text>
                           </>
                     }
                 </Pressable>
@@ -556,32 +574,32 @@ export default function Perfil() {
                 <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
                     <Pressable style={s.modalOverlay} onPress={() => setModalEditar(false)}>
                         <Pressable style={s.modalCard} onPress={() => {}}>
-                            <Text style={s.modalTitulo}>Editar perfil</Text>
-                            <Text style={s.modalLabel}>Nombre de usuario</Text>
+                            <Text style={s.modalTitulo}>{t("perfil.editar_perfil")}</Text>
+                            <Text style={s.modalLabel}>{t("perfil.nombre_usuario_label")}</Text>
                             <TextInput
                                 style={s.modalInput}
                                 value={editUsername}
                                 onChangeText={setEditUsername}
-                                placeholder="Tu nombre de usuario"
+                                placeholder={t("perfil.nombre_usuario_label")}
                                 placeholderTextColor="#8A8A8A"
                                 autoCapitalize="none"
                                 maxLength={30}
                             />
-                            <Text style={s.modalLabel}>País</Text>
+                            <Text style={s.modalLabel}>{t("perfil.pais_modal")}</Text>
                             <TextInput
                                 style={s.modalInput}
                                 value={editPais}
                                 onChangeText={setEditPais}
-                                placeholder="Tu país"
+                                placeholder={t("perfil.pais_modal")}
                                 placeholderTextColor="#8A8A8A"
                                 maxLength={80}
                             />
-                            <Text style={s.modalLabel}>Ciudad</Text>
+                            <Text style={s.modalLabel}>{t("perfil.ciudad_modal")}</Text>
                             <TextInput
                                 style={s.modalInput}
                                 value={editCiudad}
                                 onChangeText={setEditCiudad}
-                                placeholder="Tu ciudad"
+                                placeholder={t("perfil.ciudad_modal")}
                                 placeholderTextColor="#8A8A8A"
                                 maxLength={80}
                             />
@@ -592,11 +610,11 @@ export default function Perfil() {
                             >
                                 {guardandoPerfil
                                     ? <ActivityIndicator color="#fff" />
-                                    : <Text style={s.modalBotonTexto}>Guardar cambios</Text>
+                                    : <Text style={s.modalBotonTexto}>{t("perfil.guardar_cambios")}</Text>
                                 }
                             </Pressable>
                             <Pressable style={s.modalCancelar} onPress={() => setModalEditar(false)}>
-                                <Text style={s.modalCancelarTexto}>Cancelar</Text>
+                                <Text style={s.modalCancelarTexto}>{t("perfil.cancelar")}</Text>
                             </Pressable>
                         </Pressable>
                     </Pressable>
@@ -608,11 +626,11 @@ export default function Perfil() {
                 <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
                     <Pressable style={s.passOverlay} onPress={() => setModalPassword(false)} />
                     <View style={s.passSheet}>
-                        <Text style={s.passTitulo}>Cambiar contraseña</Text>
+                        <Text style={s.passTitulo}>{t("perfil.cambiar_password")}</Text>
 
                         <TextInput
                             style={s.passInput}
-                            placeholder="Contraseña actual"
+                            placeholder={t("perfil.password_actual")}
                             placeholderTextColor="#9AAABB"
                             secureTextEntry
                             value={passActual}
@@ -621,7 +639,7 @@ export default function Perfil() {
                         />
                         <TextInput
                             style={s.passInput}
-                            placeholder="Nueva contraseña"
+                            placeholder={t("perfil.password_nueva")}
                             placeholderTextColor="#9AAABB"
                             secureTextEntry
                             value={passNueva}
@@ -630,7 +648,7 @@ export default function Perfil() {
                         />
                         <TextInput
                             style={s.passInput}
-                            placeholder="Confirmar nueva contraseña"
+                            placeholder={t("perfil.confirmar_password")}
                             placeholderTextColor="#9AAABB"
                             secureTextEntry
                             value={passConfirmar}
@@ -645,7 +663,7 @@ export default function Perfil() {
                         >
                             {cambiandoPass
                                 ? <ActivityIndicator color="#FFFFFF" size="small" />
-                                : <Text style={s.passBtnTexto}>Guardar cambios</Text>
+                                : <Text style={s.passBtnTexto}>{t("perfil.guardar_cambios")}</Text>
                             }
                         </Pressable>
 
@@ -654,7 +672,7 @@ export default function Perfil() {
                             onPress={() => { setModalPassword(false); setPassActual(""); setPassNueva(""); setPassConfirmar(""); }}
                             disabled={cambiandoPass}
                         >
-                            <Text style={s.passCancelarTexto}>Cancelar</Text>
+                            <Text style={s.passCancelarTexto}>{t("perfil.cancelar")}</Text>
                         </Pressable>
                     </View>
                 </KeyboardAvoidingView>
@@ -876,6 +894,13 @@ const s = StyleSheet.create({
     modalBotonTexto: { color: "#fff", fontSize: 16, fontWeight: "700" },
     modalCancelar: { height: 44, justifyContent: "center", alignItems: "center", marginTop: 8 },
     modalCancelarTexto: { fontSize: 14, color: "#6B85A8" },
+
+    // Selector de idioma
+    idiomaOpciones: { flexDirection: "row", gap: 4 },
+    idiomaBtn: { paddingHorizontal: 12, paddingVertical: 5, borderRadius: 8, borderWidth: 1, borderColor: "#D0D7E3", backgroundColor: "#F8F9FB" },
+    idiomaBtnActivo: { backgroundColor: "#10233E", borderColor: "#10233E" },
+    idiomaBtnTexto: { fontSize: 13, fontWeight: "700" as const, color: "#6B85A8" },
+    idiomaBtnTextoActivo: { color: "#FFFFFF" },
 
     // Historial de check-ins
     seccionCard: {
