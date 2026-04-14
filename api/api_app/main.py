@@ -229,6 +229,19 @@ def register(
     if payload.ciudad is not None:
         ciudad_limpia = payload.ciudad.strip()
 
+    # Validar edad mínima de 18 años (obligatorio para app de alcohol)
+    if payload.fecha_nacimiento is not None:
+        from datetime import date
+        hoy = date.today()
+        edad = hoy.year - payload.fecha_nacimiento.year - (
+            (hoy.month, hoy.day) < (payload.fecha_nacimiento.month, payload.fecha_nacimiento.day)
+        )
+        if edad < 18:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Debes tener al menos 18 años para registrarte",
+            )
+
     # Comprobamos si el email ya existe
     existing_email = db.query(User).filter(User.email == payload.email).first()
     if existing_email is not None:

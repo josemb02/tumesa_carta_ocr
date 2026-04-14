@@ -340,7 +340,7 @@ def obtener_mi_mapa(
             Checkin.user_id == current_user.id
         ).order_by(
             desc(Checkin.created_at)
-        ).all()
+        ).limit(500).all()
     except SQLAlchemyError as exc:
         logger.error("[my-map] Error al consultar check-ins: %s", exc)
         return []

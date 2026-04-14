@@ -76,6 +76,12 @@ type TipoContextoAuth = {
      * Se llama desde perfil.tsx tras subir la imagen a Cloudinary.
      */
     guardarAvatar: (avatarUrl: string) => Promise<void>;
+    /*
+     * Actualiza parcialmente los datos del usuario en el contexto.
+     * Se usa después de editar el perfil para que el nombre y ciudad
+     * se reflejen inmediatamente en toda la app sin cerrar sesión.
+     */
+    actualizarUsuario: (datos: Partial<UsuarioAuth>) => void;
 };
 
 /*
@@ -305,6 +311,15 @@ function ProveedorAuth({ children }: { children: React.ReactNode }) {
         setUsuario(prev => prev ? { ...prev, avatar_url: perfilActualizado.avatar_url } : prev);
     }
 
+    /*
+     * Actualiza parcialmente los datos del usuario en el contexto.
+     * Se usa después de editar el perfil para que el nombre y ciudad
+     * se reflejen inmediatamente en toda la app sin cerrar sesión.
+     */
+    function actualizarUsuario(datos: Partial<UsuarioAuth>) {
+        setUsuario(prev => prev ? { ...prev, ...datos } : prev);
+    }
+
     return (
         <ContextoAuth.Provider
             value={{
@@ -317,6 +332,7 @@ function ProveedorAuth({ children }: { children: React.ReactNode }) {
                 recargarUsuario,
                 iniciarSesionConGoogle,
                 guardarAvatar,
+                actualizarUsuario,
             }}
         >
             {children}

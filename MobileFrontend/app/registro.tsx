@@ -155,6 +155,20 @@ export default function Registro() {
 
     const manejarRegistro = async () => {
         if (!validarPaso2()) return;
+
+        // Validar edad mínima 18 años si se proporcionó fecha de nacimiento
+        if (fechaNacimiento) {
+            const hoy = new Date();
+            const nacimiento = new Date(fechaNacimiento);
+            const edad = hoy.getFullYear() - nacimiento.getFullYear() -
+                ((hoy.getMonth() < nacimiento.getMonth() ||
+                  (hoy.getMonth() === nacimiento.getMonth() && hoy.getDate() < nacimiento.getDate())) ? 1 : 0);
+            if (edad < 18) {
+                Alert.alert("Edad no permitida", "Debes tener al menos 18 años para registrarte en BeerNow.");
+                return;
+            }
+        }
+
         try {
             setCargando(true);
             await registrarNuevoUsuario(
@@ -318,7 +332,7 @@ export default function Registro() {
                                     />
                                 </Campo>
 
-                                <Campo label="Fecha de nacimiento (opcional)">
+                                <Campo label="Fecha de nacimiento (debes tener +18 años)">
                                     <Pressable
                                         style={[styles.input, styles.selector]}
                                         onPress={() => setModalFecha(true)}

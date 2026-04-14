@@ -99,7 +99,7 @@ type Rachas = {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function Perfil() {
-    const { usuario, cerrarSesion, token, guardarAvatar } = usarAuth();
+    const { usuario, cerrarSesion, token, guardarAvatar, actualizarUsuario } = usarAuth();
     const router = useRouter();
     const [cerrando, setCerrando] = useState(false);
     const [subiendo, setSubiendo] = useState(false);
@@ -240,6 +240,8 @@ export default function Perfil() {
                 body: { username: u, pais: p, ciudad: c },
             });
             setModalEditar(false);
+            // Actualizar el contexto para reflejar los cambios en toda la app inmediatamente
+            actualizarUsuario({ username: u, pais: p, ciudad: c });
             Alert.alert("✓ Guardado", "Perfil actualizado correctamente");
             await cargarTodo();
         } catch (err: any) {
