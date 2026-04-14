@@ -332,6 +332,13 @@ export default function Registro() {
                                     />
                                 </Campo>
 
+                                {/* Aviso edad mínima obligatorio */}
+                                <View style={styles.avisoEdad}>
+                                    <Text style={styles.avisoEdadTexto}>
+                                        🔞 BeerNow es solo para mayores de 18 años
+                                    </Text>
+                                </View>
+
                                 <Campo label="Fecha de nacimiento (debes tener +18 años)">
                                     <Pressable
                                         style={[styles.input, styles.selector]}
@@ -643,5 +650,19 @@ const styles = StyleSheet.create({
     },
     avisoEnlace: {
         fontWeight: "700",
+    },
+    avisoEdad: {
+        backgroundColor: "#FFF3CD",
+        borderRadius: 10,
+        padding: 12,
+        marginBottom: 12,
+        borderWidth: 1,
+        borderColor: "#FFE082",
+    },
+    avisoEdadTexto: {
+        fontSize: 13,
+        color: "#856404",
+        fontWeight: "600",
+        textAlign: "center",
     },
 });

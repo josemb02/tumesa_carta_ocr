@@ -35,25 +35,15 @@ logger = logging.getLogger("beermap")
 
 def get_client_ip(request: Request) -> str:
     """
-    Devuelve la IP del cliente de la forma más razonable posible.
+    Devuelve la IP real del cliente de forma segura.
 
-    Qué hace:
-    - Si hay cabecera X-Forwarded-For, usa la ÚLTIMA IP (añadida por Railway).
-    - Si no, usa request.client.host.
-    - Si no puede obtenerla, devuelve 'unknown'.
-
-    Por qué la última y no la primera:
-    - La primera IP la puede falsificar el cliente.
-    - Railway siempre añade la IP real del cliente al final de la cadena,
-      por lo que esa posición no es falsificable desde el exterior.
-
-    Esto sirve para:
-    - logs
-    - auditoría
-    - rate limit
+    Usa la ÚLTIMA IP del header X-Forwarded-For porque en Railway
+    el proxy añade la IP real al final — el cliente no puede falsificarla.
+    Usar la primera IP es un vector conocido para evadir rate limiting.
     """
     xff = request.headers.get("x-forwarded-for")
     if xff is not None and xff.strip() != "":
+        # Última IP = añadida por el proxy de Railway, no falsificable
         partes = [p.strip() for p in xff.split(",") if p.strip()]
         if partes:
             return partes[-1]
