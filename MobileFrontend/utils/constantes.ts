@@ -53,3 +53,9 @@ export const CLAVE_REFRESH_TOKEN = "beermap_refresh_token";
  * Si existe y vale "true", no se muestra el onboarding al abrir la app.
  */
 export const CLAVE_ONBOARDING_VISTO = "beernow_onboarding_visto";
+
+/*
+ * Clave para guardar en SecureStore el idioma elegido por el usuario.
+ * Valores posibles: "es" | "en"
+ */
+export const CLAVE_IDIOMA = "beernow_idioma";

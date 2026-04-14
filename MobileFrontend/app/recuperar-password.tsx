@@ -5,9 +5,11 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { API_URL } from "../utils/constantes";
+import { useT } from "../i18n";
 
 export default function RecuperarPassword() {
     const router = useRouter();
+    const t = useT();
     const [email, setEmail] = useState("");
     const [cargando, setCargando] = useState(false);
     const [enviado, setEnviado] = useState(false);
@@ -15,7 +17,7 @@ export default function RecuperarPassword() {
     const manejarEnvio = async () => {
         const emailLimpio = email.trim().toLowerCase();
         if (!emailLimpio) {
-            Alert.alert("Error", "Introduce tu email");
+            Alert.alert(t("general.error"), t("recuperar.error_email_vacio"));
             return;
         }
         try {
@@ -26,21 +28,15 @@ export default function RecuperarPassword() {
                 body: JSON.stringify({ email: emailLimpio }),
             });
             if (res.status === 429) {
-                Alert.alert(
-                    "Demasiados intentos",
-                    "Has solicitado demasiados enlaces seguidos. Espera 1 hora antes de volver a intentarlo."
-                );
+                Alert.alert(t("recuperar.error_intentos"), t("recuperar.error_intentos_sub"));
                 return;
             }
             setEnviado(true);
         } catch (error: any) {
             if (error?.status === 429 || (typeof error?.message === 'string' && error.message.includes('429'))) {
-                Alert.alert(
-                    "Demasiados intentos",
-                    "Has solicitado demasiados enlaces seguidos. Espera 1 hora antes de volver a intentarlo."
-                );
+                Alert.alert(t("recuperar.error_intentos"), t("recuperar.error_intentos_sub"));
             } else {
-                Alert.alert("Error", "Sin conexión. Comprueba tu internet");
+                Alert.alert(t("general.error"), t("recuperar.error_red"));
             }
         } finally {
             setCargando(false);
@@ -52,13 +48,10 @@ export default function RecuperarPassword() {
             <SafeAreaView style={styles.safeArea}>
                 <View style={styles.centrado}>
                     <Text style={styles.emoji}>📬</Text>
-                    <Text style={styles.titulo}>Revisa tu email</Text>
-                    <Text style={styles.subtitulo}>
-                        Si el email está registrado recibirás un enlace para restablecer tu contraseña.
-                        El enlace caduca en 1 hora.
-                    </Text>
+                    <Text style={styles.titulo}>{t("recuperar.enviado_titulo")}</Text>
+                    <Text style={styles.subtitulo}>{t("recuperar.enviado_sub")}</Text>
                     <Pressable style={styles.boton} onPress={() => router.back()}>
-                        <Text style={styles.textoBoton}>Volver al login</Text>
+                        <Text style={styles.textoBoton}>{t("recuperar.volver_login")}</Text>
                     </Pressable>
                 </View>
             </SafeAreaView>
@@ -70,18 +63,16 @@ export default function RecuperarPassword() {
             <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
                 <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
                     <Pressable style={styles.volver} onPress={() => router.back()}>
-                        <Text style={styles.volverTexto}>← Volver</Text>
+                        <Text style={styles.volverTexto}>{t("recuperar.volver")}</Text>
                     </Pressable>
-                    <Text style={styles.titulo}>¿Olvidaste tu contraseña?</Text>
-                    <Text style={styles.subtitulo}>
-                        Introduce tu email y te enviaremos un enlace para restablecerla.
-                    </Text>
+                    <Text style={styles.titulo}>{t("recuperar.titulo")}</Text>
+                    <Text style={styles.subtitulo}>{t("recuperar.subtitulo")}</Text>
                     <View style={styles.campo}>
-                        <Text style={styles.label}>Email</Text>
+                        <Text style={styles.label}>{t("recuperar.email")}</Text>
                         <TextInput
                             value={email}
                             onChangeText={setEmail}
-                            placeholder="Tu email"
+                            placeholder={t("recuperar.email_placeholder")}
                             placeholderTextColor="#8A8A8A"
                             keyboardType="email-address"
                             autoCapitalize="none"
@@ -94,7 +85,10 @@ export default function RecuperarPassword() {
                         onPress={manejarEnvio}
                         disabled={cargando}
                     >
-                        {cargando ? <ActivityIndicator color="#fff" /> : <Text style={styles.textoBoton}>Enviar enlace</Text>}
+                        {cargando
+                            ? <ActivityIndicator color="#fff" />
+                            : <Text style={styles.textoBoton}>{t("recuperar.enviar")}</Text>
+                        }
                     </Pressable>
                 </ScrollView>
             </KeyboardAvoidingView>

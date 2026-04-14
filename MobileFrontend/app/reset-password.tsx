@@ -5,9 +5,11 @@ import {
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { API_URL } from "../utils/constantes";
+import { useT } from "../i18n";
 
 export default function ResetPassword() {
     const router = useRouter();
+    const t = useT();
     const { token } = useLocalSearchParams<{ token: string }>();
     const [password, setPassword] = useState("");
     const [passwordRepetida, setPasswordRepetida] = useState("");
@@ -15,15 +17,15 @@ export default function ResetPassword() {
 
     const manejarReset = async () => {
         if (!token) {
-            Alert.alert("Error", "Enlace inválido");
+            Alert.alert(t("general.error"), t("reset.error_enlace"));
             return;
         }
         if (password.length < 8) {
-            Alert.alert("Error", "La contraseña debe tener al menos 8 caracteres");
+            Alert.alert(t("general.error"), t("reset.error_corta"));
             return;
         }
         if (password !== passwordRepetida) {
-            Alert.alert("Error", "Las contraseñas no coinciden");
+            Alert.alert(t("general.error"), t("reset.error_coincide"));
             return;
         }
         try {
@@ -35,14 +37,14 @@ export default function ResetPassword() {
             });
             const data = await res.json();
             if (!res.ok) {
-                Alert.alert("Error", data.detail || "Enlace inválido o expirado");
+                Alert.alert(t("general.error"), data.detail || t("reset.error_expirado"));
                 return;
             }
-            Alert.alert("Listo", "Contraseña actualizada. Ya puedes iniciar sesión.", [
-                { text: "OK", onPress: () => router.replace("/login") }
+            Alert.alert(t("reset.exito_titulo"), t("reset.exito_sub"), [
+                { text: t("general.ok"), onPress: () => router.replace("/login") }
             ]);
         } catch {
-            Alert.alert("Error", "Sin conexión. Comprueba tu internet");
+            Alert.alert(t("general.error"), t("reset.error_red"));
         } finally {
             setCargando(false);
         }
@@ -52,14 +54,14 @@ export default function ResetPassword() {
         <SafeAreaView style={styles.safeArea}>
             <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
                 <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-                    <Text style={styles.titulo}>Nueva contraseña</Text>
-                    <Text style={styles.subtitulo}>Elige una contraseña segura de al menos 8 caracteres.</Text>
+                    <Text style={styles.titulo}>{t("reset.titulo")}</Text>
+                    <Text style={styles.subtitulo}>{t("reset.subtitulo")}</Text>
                     <View style={styles.campo}>
-                        <Text style={styles.label}>Nueva contraseña</Text>
+                        <Text style={styles.label}>{t("reset.nueva_password")}</Text>
                         <TextInput
                             value={password}
                             onChangeText={setPassword}
-                            placeholder="Mínimo 8 caracteres"
+                            placeholder={t("reset.nueva_placeholder")}
                             placeholderTextColor="#8A8A8A"
                             secureTextEntry
                             autoCapitalize="none"
@@ -67,11 +69,11 @@ export default function ResetPassword() {
                         />
                     </View>
                     <View style={styles.campo}>
-                        <Text style={styles.label}>Repetir contraseña</Text>
+                        <Text style={styles.label}>{t("reset.repetir_password")}</Text>
                         <TextInput
                             value={passwordRepetida}
                             onChangeText={setPasswordRepetida}
-                            placeholder="Repite la contraseña"
+                            placeholder={t("reset.repetir_placeholder")}
                             placeholderTextColor="#8A8A8A"
                             secureTextEntry
                             autoCapitalize="none"
@@ -83,7 +85,10 @@ export default function ResetPassword() {
                         onPress={manejarReset}
                         disabled={cargando}
                     >
-                        {cargando ? <ActivityIndicator color="#fff" /> : <Text style={styles.textoBoton}>Guardar contraseña</Text>}
+                        {cargando
+                            ? <ActivityIndicator color="#fff" />
+                            : <Text style={styles.textoBoton}>{t("reset.guardar")}</Text>
+                        }
                     </Pressable>
                 </ScrollView>
             </KeyboardAvoidingView>

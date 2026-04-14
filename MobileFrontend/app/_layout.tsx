@@ -3,6 +3,7 @@ import { Slot, useRouter } from "expo-router";
 import * as Notifications from "expo-notifications";
 import { ProveedorAuth } from "../contexto/ContextoAuth";
 import { configurarComportamientoNotificaciones } from "../servicios/servicioNotificaciones";
+import { inicializarIdioma } from "../i18n";
 
 // Comportamiento en primer plano (módulo, no componente)
 configurarComportamientoNotificaciones();
@@ -38,6 +39,11 @@ function GestorNotificaciones() {
 }
 
 export default function RootLayout() {
+    // Inicializar idioma al arrancar: lee la preferencia guardada o detecta el sistema
+    useEffect(() => {
+        inicializarIdioma();
+    }, []);
+
     return (
         <ProveedorAuth>
             <GestorNotificaciones />

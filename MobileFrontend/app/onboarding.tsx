@@ -12,41 +12,40 @@ import {
 import { useRouter } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 import { CLAVE_ONBOARDING_VISTO } from "../utils/constantes";
+import { useT } from "../i18n";
 
 const { width } = Dimensions.get("window");
 
-// Contenido de los 3 slides del onboarding
-const SLIDES = [
-    {
-        id: "1",
-        emoji: "🍺",
-        titulo: "Registra cada cerveza",
-        subtitulo:
-            "Marca en el mapa cada vez que disfrutes una cerveza. Guarda el precio, añade una foto y deja tu nota personal.",
-        color: "#10233E",
-    },
-    {
-        id: "2",
-        emoji: "🏆",
-        titulo: "Compite con amigos",
-        subtitulo:
-            "Crea grupos, únete con código y compite en rankings globales, por ciudad o por semana. ¿Quién lidera esta semana?",
-        color: "#1A3A5C",
-    },
-    {
-        id: "3",
-        emoji: "⭐",
-        titulo: "Gana puntos e iconos",
-        subtitulo:
-            "Cada cerveza suma puntos. Úsalos para desbloquear iconos exclusivos en la tienda. ¡Ve un vídeo y gana 20 puntos extra!",
-        color: "#0F2030",
-    },
-];
-
 export default function Onboarding() {
     const router = useRouter();
+    const t = useT();
     const [indiceActual, setIndiceActual] = useState(0);
     const listaRef = useRef<FlatList>(null);
+
+    // Contenido de los 3 slides — generado con t() para que cambie al cambiar idioma
+    const SLIDES = [
+        {
+            id: "1",
+            emoji: "🍺",
+            titulo: t("onboarding.slide1_titulo"),
+            subtitulo: t("onboarding.slide1_sub"),
+            color: "#10233E",
+        },
+        {
+            id: "2",
+            emoji: "🏆",
+            titulo: t("onboarding.slide2_titulo"),
+            subtitulo: t("onboarding.slide2_sub"),
+            color: "#1A3A5C",
+        },
+        {
+            id: "3",
+            emoji: "⭐",
+            titulo: t("onboarding.slide3_titulo"),
+            subtitulo: t("onboarding.slide3_sub"),
+            color: "#0F2030",
+        },
+    ];
 
     // Actualizar el índice al hacer scroll
     const alCambiarSlide = useRef(({ viewableItems }: { viewableItems: ViewToken[] }) => {
@@ -77,7 +76,7 @@ export default function Onboarding() {
             {/* Botón saltar — esquina superior derecha */}
             {!esUltimo && (
                 <Pressable style={s.saltar} onPress={terminarOnboarding}>
-                    <Text style={s.saltarTexto}>Saltar</Text>
+                    <Text style={s.saltarTexto}>{t("onboarding.saltar")}</Text>
                 </Pressable>
             )}
 
@@ -127,14 +126,15 @@ export default function Onboarding() {
                     onPress={handleSiguiente}
                 >
                     <Text style={s.botonTexto}>
-                        {esUltimo ? "¡Empezar!" : "Siguiente"}
+                        {esUltimo ? t("onboarding.empezar") : t("onboarding.siguiente")}
                     </Text>
                 </Pressable>
 
                 {/* Enlace login para usuarios que ya tienen cuenta */}
                 <Pressable onPress={terminarOnboarding} style={s.yaRegistrado}>
                     <Text style={s.yaRegistradoTexto}>
-                        ¿Ya tienes cuenta? <Text style={s.yaRegistradoEnlace}>Iniciar sesión</Text>
+                        {t("onboarding.ya_cuenta")}{" "}
+                        <Text style={s.yaRegistradoEnlace}>{t("onboarding.iniciar_sesion")}</Text>
                     </Text>
                 </Pressable>
             </View>
