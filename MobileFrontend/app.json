@@ -4,7 +4,7 @@
     "slug": "beernow",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/imagenes/BeerMap_APP_logo.png",
+    "icon": "./assets/imagenes/BeerNow_APP_logo.png",
     "scheme": "beermap",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -26,14 +26,14 @@
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/imagenes/BeerMap_APP_logo.png"
+      "favicon": "./assets/imagenes/BeerNow_APP_logo.png"
     },
     "plugins": [
       "expo-router",
       [
         "expo-splash-screen",
         {
-          "image": "./assets/imagenes/BeerMap_APP_logo.png",
+          "image": "./assets/imagenes/BeerNow_APP_logo.png",
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#F7F4EC",
