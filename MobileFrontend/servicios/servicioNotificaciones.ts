@@ -32,7 +32,9 @@ export async function registrarTokenPush(token: string): Promise<void> {
 
         if (estadoFinal !== "granted") return;
 
-        const tokenPush = await Notifications.getExpoPushTokenAsync();
+        const tokenPush = await Notifications.getExpoPushTokenAsync({
+            projectId: "53f42ea9-884f-470f-8f6b-e0a236a94777",
+        });
 
         await hacerPeticion("/notifications/register-token", {
             metodo: "POST",
@@ -59,6 +61,8 @@ export function configurarComportamientoNotificaciones(): void {
             shouldShowAlert: true,
             shouldPlaySound: true,
             shouldSetBadge: false,
+            shouldShowBanner: true,
+            shouldShowList: true,
         }),
     });
 }
