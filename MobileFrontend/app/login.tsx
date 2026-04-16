@@ -55,7 +55,11 @@ export default function Login() {
     useEffect(() => {
         if (response?.type !== "success") return;
 
-        const idToken = response.params?.id_token;
+        // En expo-auth-session v7 el idToken viene en authentication, no en params
+        const idToken =
+            response.authentication?.idToken ??
+            (response as any).params?.id_token;
+
         if (!idToken) {
             Alert.alert(t("general.error"), t("login.error_google"));
             return;
